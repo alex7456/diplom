@@ -2,8 +2,8 @@
 FastAPI веб-приложение с БД (упрощённая версия без авторизации для теста)
 """
 
-from fastapi import FastAPI, Request, HTTPException, Depends, Form, BackgroundTasks
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi import FastAPI, Request, HTTPException, Depends, Form, BackgroundTasks, UploadFile, File
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -11,7 +11,8 @@ from datetime import datetime
 from typing import Optional, List
 import time
 import pandas as pd
-from io import StringIO
+from io import StringIO, BytesIO
+from collections import defaultdict
 
 from database import create_tables, get_db, TransactionRepository
 from ml_service import EnhancedExpenseClassifier
@@ -128,6 +129,194 @@ async def predict_transaction(
     }
 
 
+@app.post("/api/upload-bank-statement")
+async def upload_bank_statement(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Загрузка банковской выписки (CSV или Excel)
+    Поддерживаются форматы: Сбер, Т-Банк, Альфа, ВТБ
+    """
+    import chardet
+    import csv
+    
+    contents = await file.read()
+    
+    # Определяем тип файла
+    if file.filename.endswith('.csv'):
+        # Пробуем определить кодировку
+        detected = chardet.detect(contents)
+        encoding = detected['encoding'] if detected['encoding'] else 'utf-8'
+        
+        # Пробуем разные разделители
+        separators = [',', ';', '\t', '|']
+        df = None
+        
+        # Сначала пробуем прочитать как обычный CSV с автоопределением
+        for sep in separators:
+            try:
+                # Пробуем прочитать с определённым разделителем
+                text = contents.decode(encoding, errors='ignore')
+                from io import StringIO
+                df = pd.read_csv(StringIO(text), sep=sep, encoding=encoding, 
+                                on_bad_lines='skip', engine='python')
+                if len(df.columns) > 1:
+                    print(f"Успешно прочитан CSV с разделителем '{sep}' и кодировкой {encoding}")
+                    break
+            except:
+                continue
+        
+        # Если не получилось, пробуем через стандартный csv модуль
+        if df is None or len(df.columns) <= 1:
+            try:
+                text = contents.decode(encoding, errors='ignore')
+                lines = text.split('\n')
+                dialect = csv.Sniffer().sniff(lines[0])
+                from io import StringIO
+                df = pd.read_csv(StringIO(text), dialect=dialect, on_bad_lines='skip')
+                print(f"Успешно определён диалект CSV: {dialect.delimiter}")
+            except:
+                pass
+        
+        # Если всё ещё нет, пробуем без заголовка
+        if df is None or len(df.columns) <= 1:
+            for sep in separators:
+                try:
+                    text = contents.decode(encoding, errors='ignore')
+                    from io import StringIO
+                    df = pd.read_csv(StringIO(text), sep=sep, header=None, on_bad_lines='skip')
+                    if len(df.columns) > 1:
+                        # Используем первую строку как заголовок
+                        df.columns = df.iloc[0]
+                        df = df[1:]
+                        break
+                except:
+                    continue
+        
+        if df is None or df.empty:
+            raise HTTPException(status_code=400, detail="Не удалось прочитать CSV файл. Проверьте формат.")
+    
+    elif file.filename.endswith(('.xlsx', '.xls')):
+        df = pd.read_excel(BytesIO(contents))
+    else:
+        raise HTTPException(status_code=400, detail="Неподдерживаемый формат файла. Используйте CSV или Excel.")
+    
+    if df.empty:
+        raise HTTPException(status_code=400, detail="Файл пуст")
+    
+    # Приводим колонки к нижнему регистру для поиска
+    df.columns = [str(col).lower().strip() for col in df.columns]
+    
+    # Автоопределение колонок
+    description_col = None
+    amount_col = None
+    
+    # Ищем колонку с описанием
+    description_keywords = ['описание', 'назначение', 'description', 'наименование', 'comment', 'название', 'detail']
+    for col in df.columns:
+        if any(keyword in col for keyword in description_keywords):
+            description_col = col
+            break
+    
+    # Если не нашли, берём первую текстовую колонку
+    if description_col is None:
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                description_col = col
+                break
+    
+    # Ищем колонку с суммой
+    amount_keywords = ['сумма', 'amount', 'списано', 'зачислено', 'payment', 'total', 'сумма операции']
+    for col in df.columns:
+        if any(keyword in col for keyword in amount_keywords):
+            amount_col = col
+            break
+    
+    # Если не нашли, берём числовую колонку
+    if amount_col is None:
+        for col in df.columns:
+            if df[col].dtype in ['float64', 'int64']:
+                amount_col = col
+                break
+    
+    # Обработка транзакций
+    repo = TransactionRepository(db)
+    processed = 0
+    total_expenses = 0
+    category_stats = defaultdict(int)
+    errors = []
+    
+    for idx, row in df.iterrows():
+        try:
+            # Получаем описание
+            description = ""
+            if description_col and pd.notna(row[description_col]):
+                description = str(row[description_col]).strip()
+            
+            if not description or len(description) < 2:
+                continue
+            
+            # Пропускаем технические строки
+            skip_words = ['баланс', 'остаток', 'выписка', 'начало', 'конец', 'итого', 'всего', 
+                         'page', 'total', 'balance', 'остаток на', 'начальный остаток']
+            if any(word in description.lower() for word in skip_words):
+                continue
+            
+            # Получаем сумму
+            amount = None
+            if amount_col and pd.notna(row[amount_col]):
+                try:
+                    amount = float(row[amount_col])
+                    
+                    # Определяем знак суммы по названию колонки
+                    if 'списано' in str(amount_col).lower() or 'расход' in str(amount_col).lower():
+                        amount = -abs(amount)
+                    elif 'зачислено' in str(amount_col).lower() or 'доход' in str(amount_col).lower():
+                        amount = abs(amount)
+                    # Если сумма положительная, предполагаем что это расход (по умолчанию)
+                    elif amount > 0:
+                        amount = -amount
+                except:
+                    amount = None
+            
+            # Предсказываем категорию
+            category, confidence = ml_service.predict(description, amount)
+            
+            # Сохраняем в БД
+            repo.create(
+                user_id=1,
+                description=description[:500],
+                amount=amount if amount else None,
+                predicted_category=category,
+                confidence=confidence,
+                processing_time_ms=0
+            )
+            processed += 1
+            if amount and amount < 0:
+                total_expenses += abs(amount)
+            category_stats[category] += 1
+            
+        except Exception as e:
+            errors.append(f"Строка {idx}: {str(e)[:100]}")
+            continue
+    
+    if processed == 0:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": f"Не удалось обработать ни одной транзакции. Ошибки: {errors[:3]}"}
+        )
+    
+    return {
+        "success": True,
+        "total": processed,
+        "total_expenses": total_expenses,
+        "category_stats": dict(category_stats),
+        "filename": file.filename,
+        "errors": errors[:5] if errors else []
+    }
+
+
 @app.get("/api/transactions")
 async def get_transactions(
     limit: int = 50,
@@ -170,6 +359,19 @@ async def delete_transaction(
     
     return {"success": True}
 
+@app.get("/api/transactions/clear-all")
+async def clear_all_transactions_get(db: Session = Depends(get_db)):
+    """Очистка всех транзакций (GET метод)"""
+    from sqlalchemy import text
+    
+    result = db.execute(text("DELETE FROM transactions WHERE user_id = 1"))
+    db.commit()
+    
+    return {
+        "success": True,
+        "deleted_count": result.rowcount,
+        "message": f"Удалено {result.rowcount} транзакций"
+    }
 
 @app.get("/api/stats")
 async def get_stats(db: Session = Depends(get_db)):
@@ -232,7 +434,6 @@ async def export_csv(days: int = 90, db: Session = Depends(get_db)):
     analytics = AnalyticsService(db)
     df = analytics.get_export_data(1, days)
     
-    from fastapi.responses import StreamingResponse
     stream = StringIO()
     df.to_csv(stream, index=False, encoding='utf-8-sig')
     response = StreamingResponse(
@@ -249,9 +450,7 @@ async def export_excel(days: int = 90, db: Session = Depends(get_db)):
     analytics = AnalyticsService(db)
     df = analytics.get_export_data(1, days)
     
-    from fastapi.responses import StreamingResponse
-    import io
-    output = io.BytesIO()
+    output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name='Транзакции', index=False)
     output.seek(0)

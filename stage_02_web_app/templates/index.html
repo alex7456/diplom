@@ -1,4 +1,4 @@
-<!-- index.html - упрощённая версия без авторизации -->
+<!-- index.html - с загрузкой банковских выписок и управлением данными -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Expense Categorizer - Главная</title>
     <style>
-        /* Ваши стили остаются без изменений */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #f5f5f5; }
         .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
@@ -20,8 +19,13 @@
         label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
         input, textarea { width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px; }
         input:focus, textarea:focus { outline: none; border-color: #667eea; }
-        button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 30px; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 30px; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.2s; }
         button:hover { transform: translateY(-2px); }
+        .btn-danger { background: #f44336; }
+        .btn-danger:hover { background: #d32f2f; }
+        .btn-success { background: #4CAF50; }
+        .btn-success:hover { background: #388E3C; }
+        .btn-secondary { background: #607D8B; }
         .result-card { background: #f8f9fa; border-radius: 15px; padding: 20px; margin-top: 20px; display: none; }
         .result-card.show { display: block; }
         .category-badge { display: inline-block; padding: 8px 20px; border-radius: 20px; font-weight: bold; font-size: 1.2rem; margin: 10px 0; }
@@ -44,10 +48,19 @@
         .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; animation: spin 1s linear infinite; margin-left: 10px; vertical-align: middle; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .error { color: #f44336; padding: 10px; background: #ffebee; border-radius: 10px; margin-top: 10px; }
+        .success { color: #4CAF50; padding: 10px; background: #e8f5e9; border-radius: 10px; margin-top: 10px; }
         .batch-area { margin-top: 30px; padding-top: 30px; border-top: 2px solid #e0e0e0; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e0e0e0; }
         th { background: #f0f0f0; font-weight: 600; }
+        .upload-area { border: 2px dashed #e0e0e0; border-radius: 15px; padding: 30px; text-align: center; margin-top: 20px; cursor: pointer; }
+        .upload-area:hover { border-color: #667eea; background: #f8f9fa; }
+        .upload-progress { background: #e0e0e0; border-radius: 10px; height: 20px; overflow: hidden; margin: 10px 0; }
+        .upload-progress-fill { background: linear-gradient(90deg, #667eea, #764ba2); height: 100%; transition: width 0.3s ease; color: white; font-size: 11px; text-align: center; line-height: 20px; }
+        .upload-stats { background: #e3f2fd; padding: 15px; border-radius: 10px; margin-top: 10px; }
+        .file-info { font-size: 14px; color: #666; margin-top: 10px; }
+        .button-group { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 20px; }
+        .button-group button { margin: 0; }
     </style>
 </head>
 <body>
@@ -99,14 +112,34 @@
                     <div class="stat-label">Исправлено</div>
                 </div>
             </div>
+            
+            <div class="button-group">
+                <button onclick="clearHistory()" class="btn-danger">🗑️ Очистить всю историю</button>
+                <button onclick="exportData()" class="btn-success">📥 Экспорт данных (CSV)</button>
+                <button onclick="location.reload()" class="btn-secondary">🔄 Обновить страницу</button>
+            </div>
+            <div id="clearResult" style="margin-top: 15px;"></div>
         </div>
         
         <div class="main-card batch-area">
             <h2>📁 Пакетная обработка</h2>
             <p>Введите несколько транзакций (по одной на строку)</p>
-            <textarea id="batchText" rows="5" placeholder="Пятерочка&#10;Яндекс Такси&#10;Макдоналдс&#10;Аптека 36.6"></textarea>
+            <textarea id="batchText" rows="3" placeholder="Пятерочка&#10;Яндекс Такси&#10;Макдоналдс&#10;Аптека 36.6"></textarea>
             <button onclick="batchPredict()">🚀 Обработать все</button>
             <div id="batchResult"></div>
+        </div>
+        
+        <div class="main-card">
+            <h2>📂 Загрузка выписки из банка</h2>
+            <p>Поддерживаются форматы: Excel (XLSX) и CSV</p>
+            
+            <div class="upload-area" onclick="document.getElementById('bankFile').click()">
+                <div>📄 Нажмите или перетащите файл сюда</div>
+                <div class="file-info">Поддерживаются: .csv, .xlsx, .xls</div>
+                <input type="file" id="bankFile" accept=".csv,.xlsx,.xls" style="display: none" onchange="uploadBankStatement()">
+            </div>
+            
+            <div id="uploadResult" style="margin-top: 20px; display: none;"></div>
         </div>
     </div>
     
@@ -240,7 +273,7 @@
             }
             
             let html = '<h3>Результаты пакетной обработки:</h3>';
-            html += '<tr><td><th>Описание</th><th>Категория</th><th>Уверенность</th></tr>';
+            html += 'table<thead><tr><th>Описание</th><th>Категория</th><th>Уверенность</th></tr></thead><tbody>';
             
             results.forEach(r => {
                 html += `
@@ -252,10 +285,92 @@
                 `;
             });
             
-            html += '</table>';
+            html += '</tbody></table>';
             resultDiv.innerHTML = html;
             loadStats();
         }
+        
+        async function uploadBankStatement() {
+            const fileInput = document.getElementById('bankFile');
+            const file = fileInput.files[0];
+            
+            if (!file) return;
+            
+            const resultDiv = document.getElementById('uploadResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<div class="loading"></div> Загрузка и обработка файла...';
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/api/upload-bank-statement', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    let html = `
+                        <div class="upload-stats">
+                            <h4>✅ Загрузка завершена!</h4>
+                            <p>📊 Обработано транзакций: <strong>${data.total}</strong></p>
+                            <p>💰 Общая сумма расходов: <strong>${Math.abs(data.total_expenses || 0).toLocaleString()} ₽</strong></p>
+                            <p>📁 Файл: ${escapeHtml(data.filename)}</p>
+                    `;
+                    
+                    if (data.category_stats && Object.keys(data.category_stats).length > 0) {
+                        html += `<p><strong>📈 Распределение по категориям:</strong></p><ul>`;
+                        for (const [cat, count] of Object.entries(data.category_stats)) {
+                            html += `<li>${cat}: ${count} транзакций</li>`;
+                        }
+                        html += `</ul>`;
+                    }
+                    
+                    html += `<button onclick="location.reload()" style="margin-top: 15px;">🔄 Обновить страницу</button></div>`;
+                    resultDiv.innerHTML = html;
+                    loadStats();
+                } else {
+                    resultDiv.innerHTML = `<div class="error">Ошибка: ${data.detail || 'Неизвестная ошибка'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
+            }
+            
+            fileInput.value = '';
+        }
+        
+        async function clearHistory() {
+    if (!confirm('⚠️ ВНИМАНИЕ! Это действие удалит ВСЕ транзакции без возможности восстановления. Вы уверены?')) {
+        return;
+    }
+    
+    if (!confirm('Последнее подтверждение: Удалить все данные навсегда?')) {
+        return;
+    }
+    
+    const resultDiv = document.getElementById('clearResult');
+    resultDiv.innerHTML = '<div class="loading"></div> Удаление...';
+    
+    try {
+        // Используем GET запрос
+        const response = await fetch('/api/transactions/clear-all');
+        const data = await response.json();
+        
+        if (response.ok) {
+            resultDiv.innerHTML = `<div class="success">✅ ${data.message}</div>`;
+            loadStats();
+            setTimeout(() => {
+                resultDiv.innerHTML = '';
+            }, 3000);
+        } else {
+            resultDiv.innerHTML = `<div class="error">Ошибка: ${data.detail || 'Неизвестная ошибка'}</div>`;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
+    }
+}
         
         // Инициализация
         loadStats();

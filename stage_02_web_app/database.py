@@ -145,7 +145,6 @@ class TransactionRepository:
             self.db.commit()
             self.db.refresh(transaction)
             
-            # Сохраняем обратную связь для обучения
             feedback = TrainingFeedback(
                 user_id=user_id,
                 description=transaction.description,
@@ -195,3 +194,14 @@ class TransactionRepository:
             'category_stats': category_stats,
             'corrected_count': sum(1 for t in transactions if t.user_category is not None)
         }
+    
+    def delete_all_transactions(self, user_id: int) -> int:
+        """Удаление всех транзакций пользователя"""
+        transactions = self.db.query(Transaction).filter(Transaction.user_id == user_id).all()
+        count = len(transactions)
+        
+        for t in transactions:
+            self.db.delete(t)
+        
+        self.db.commit()
+        return count
