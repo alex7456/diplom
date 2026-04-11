@@ -1,0 +1,265 @@
+<!-- index.html - упрощённая версия без авторизации -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Categorizer - Главная</title>
+    <style>
+        /* Ваши стили остаются без изменений */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #f5f5f5; }
+        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 24px; font-weight: bold; }
+        .nav-links { display: flex; gap: 20px; align-items: center; }
+        .nav-links a { color: white; text-decoration: none; padding: 8px 16px; border-radius: 8px; }
+        .nav-links a:hover { background: rgba(255,255,255,0.2); }
+        .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
+        .main-card { background: white; border-radius: 20px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
+        input, textarea { width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px; }
+        input:focus, textarea:focus { outline: none; border-color: #667eea; }
+        button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 30px; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        button:hover { transform: translateY(-2px); }
+        .result-card { background: #f8f9fa; border-radius: 15px; padding: 20px; margin-top: 20px; display: none; }
+        .result-card.show { display: block; }
+        .category-badge { display: inline-block; padding: 8px 20px; border-radius: 20px; font-weight: bold; font-size: 1.2rem; margin: 10px 0; }
+        .category-Продукты { background: #4CAF50; color: white; }
+        .category-Транспорт { background: #2196F3; color: white; }
+        .category-Кафе { background: #FF9800; color: white; }
+        .category-Такси { background: #9C27B0; color: white; }
+        .category-Аптеки { background: #E91E63; color: white; }
+        .category-Связь { background: #00BCD4; color: white; }
+        .category-Коммунальные { background: #795548; color: white; }
+        .category-Развлечения { background: #F44336; color: white; }
+        .category-Одежда { background: #673AB7; color: white; }
+        .category-Переводы { background: #607D8B; color: white; }
+        .confidence-bar { background: #e0e0e0; border-radius: 10px; height: 20px; overflow: hidden; margin: 10px 0; }
+        .confidence-fill { background: linear-gradient(90deg, #667eea, #764ba2); height: 100%; transition: width 0.3s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; color: white; font-size: 12px; font-weight: bold; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px; }
+        .stat-card { background: white; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .stat-value { font-size: 2rem; font-weight: bold; color: #667eea; }
+        .stat-label { color: #666; margin-top: 5px; }
+        .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; animation: spin 1s linear infinite; margin-left: 10px; vertical-align: middle; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .error { color: #f44336; padding: 10px; background: #ffebee; border-radius: 10px; margin-top: 10px; }
+        .batch-area { margin-top: 30px; padding-top: 30px; border-top: 2px solid #e0e0e0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+        th { background: #f0f0f0; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">💰 Expense Categorizer</div>
+        <div class="nav-links">
+            <a href="/app">Главная</a>
+            <a href="/dashboard">Аналитика</a>
+            <a href="/history">История</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="main-card">
+            <h2>📝 Новая транзакция</h2>
+            
+            <div class="input-group">
+                <label>Описание транзакции *</label>
+                <textarea id="description" placeholder="Например: Пятерочка 1234 или Яндекс Такси поездка"></textarea>
+            </div>
+            
+            <div class="input-group">
+                <label>Сумма (₽) - опционально</label>
+                <input type="number" id="amount" step="0.01" placeholder="Отрицательная для расходов, положительная для доходов">
+            </div>
+            
+            <button onclick="predict()">🔮 Определить категорию</button>
+            
+            <div id="result" class="result-card"></div>
+        </div>
+        
+        <div class="main-card">
+            <h2>📊 Статистика</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalTransactions">-</div>
+                    <div class="stat-label">Всего транзакций</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalExpenses">-</div>
+                    <div class="stat-label">Расходов (₽)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgConfidence">-</div>
+                    <div class="stat-label">Ср. уверенность</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="correctedCount">-</div>
+                    <div class="stat-label">Исправлено</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="main-card batch-area">
+            <h2>📁 Пакетная обработка</h2>
+            <p>Введите несколько транзакций (по одной на строку)</p>
+            <textarea id="batchText" rows="5" placeholder="Пятерочка&#10;Яндекс Такси&#10;Макдоналдс&#10;Аптека 36.6"></textarea>
+            <button onclick="batchPredict()">🚀 Обработать все</button>
+            <div id="batchResult"></div>
+        </div>
+    </div>
+    
+    <script>
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                if (response.ok) {
+                    const stats = await response.json();
+                    document.getElementById('totalTransactions').textContent = stats.total_transactions || 0;
+                    document.getElementById('totalExpenses').textContent = Math.round(stats.total_expenses || 0).toLocaleString();
+                    document.getElementById('avgConfidence').textContent = `${Math.round((stats.avg_confidence || 0) * 100)}%`;
+                    document.getElementById('correctedCount').textContent = stats.corrected_count || 0;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        async function predict() {
+            const description = document.getElementById('description').value;
+            const amount = document.getElementById('amount').value;
+            
+            if (!description.trim()) {
+                alert('Введите описание транзакции');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div class="loading"></div> Анализируем...';
+            resultDiv.classList.add('show');
+            
+            try {
+                const formData = new URLSearchParams();
+                formData.append('description', description);
+                if (amount) formData.append('amount', amount);
+                
+                const response = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const confidencePercent = (data.confidence * 100).toFixed(1);
+                    
+                    resultDiv.innerHTML = `
+                        <h3>✅ Транзакция сохранена!</h3>
+                        <div class="category-badge category-${data.predicted_category}">
+                            ${data.predicted_category}
+                        </div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${confidencePercent}%">
+                                ${confidencePercent}%
+                            </div>
+                        </div>
+                        <p><strong>Описание:</strong> ${escapeHtml(data.description)}</p>
+                        ${data.amount ? `<p><strong>Сумма:</strong> ${data.amount} ₽</p>` : ''}
+                        <p><strong>Время обработки:</strong> ${data.processing_time_ms} мс</p>
+                    `;
+                    
+                    document.getElementById('description').value = '';
+                    document.getElementById('amount').value = '';
+                    loadStats();
+                } else {
+                    resultDiv.innerHTML = `<div class="error">Ошибка: ${data.detail || 'Неизвестная ошибка'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        async function batchPredict() {
+            const batchText = document.getElementById('batchText').value;
+            const lines = batchText.split('\n').filter(line => line.trim());
+            
+            if (lines.length === 0) {
+                alert('Введите хотя бы одну транзакцию');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('batchResult');
+            resultDiv.innerHTML = '<div class="loading"></div> Обработка...';
+            
+            const results = [];
+            
+            for (const desc of lines) {
+                try {
+                    const formData = new URLSearchParams();
+                    formData.append('description', desc.trim());
+                    
+                    const response = await fetch('/api/predict', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    if (response.ok) {
+                        results.push({
+                            description: desc.trim(),
+                            category: data.predicted_category,
+                            confidence: (data.confidence * 100).toFixed(1)
+                        });
+                    } else {
+                        results.push({
+                            description: desc.trim(),
+                            category: 'Ошибка',
+                            confidence: '0'
+                        });
+                    }
+                } catch (error) {
+                    results.push({
+                        description: desc.trim(),
+                        category: 'Ошибка',
+                        confidence: '0'
+                    });
+                }
+            }
+            
+            let html = '<h3>Результаты пакетной обработки:</h3>';
+            html += '<tr><td><th>Описание</th><th>Категория</th><th>Уверенность</th></tr>';
+            
+            results.forEach(r => {
+                html += `
+                    <tr>
+                        <td>${escapeHtml(r.description)}</td>
+                        <td><span class="category-badge category-${r.category}" style="font-size: 0.9rem; padding: 4px 12px;">${r.category}</span></td>
+                        <td>${r.confidence}%</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</table>';
+            resultDiv.innerHTML = html;
+            loadStats();
+        }
+        
+        // Инициализация
+        loadStats();
+        setInterval(loadStats, 10000);
+    </script>
+</body>
+</html>
