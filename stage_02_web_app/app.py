@@ -14,7 +14,7 @@ import pandas as pd
 from io import StringIO, BytesIO
 from collections import defaultdict
 
-from database import create_tables, get_db, TransactionRepository
+from database import TrainingFeedback, create_tables, get_db, TransactionRepository
 from ml_service import EnhancedExpenseClassifier
 from analytics import AnalyticsService
 
@@ -48,17 +48,25 @@ create_tables()
 
 @app.on_event("startup")
 async def startup_event():
-    """Загрузка модели при запуске"""
+    """Загрузка модели при запуске с авто-дообучением"""
     import os
     print("Загрузка ML модели...")
     
     if os.path.exists('enhanced_model.pkl'):
         ml_service.load_model('enhanced_model.pkl')
         print("Модель загружена из файла")
+        
+        # Проверяем наличие неиспользованных исправлений
+        from database import SessionLocal
+        db = SessionLocal()
+        try:
+            auto_retrain_if_needed(db)
+        finally:
+            db.close()
     else:
         metrics = ml_service.train(use_synthetic=True)
         ml_service.save_model('enhanced_model.pkl')
-        print(f"Модель обучена с нуля. Accuracy: {metrics['accuracy_mean']:.3f}")
+        print(f"Модель обучена с нуля. Точность: {metrics.get('accuracy', 0):.3f}")
 
 
 # ============= Веб-страницы =============
@@ -335,12 +343,17 @@ async def update_transaction_category(
     category: str,
     db: Session = Depends(get_db)
 ):
-    """Ручная коррекция категории"""
+    """Ручная коррекция категории с мгновенным дообучением"""
     repo = TransactionRepository(db)
     transaction = repo.update_category(transaction_id, 1, category)
     
     if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # Запускаем дообучение в отдельном потоке с НОВОЙ сессией
+    import threading
+    # Передаём копию данных, а не сессию
+    threading.Thread(target=auto_retrain_if_needed, args=(db,)).start()
     
     return {"success": True, "transaction": transaction.to_dict()}
 
@@ -462,6 +475,110 @@ async def export_excel(days: int = 90, db: Session = Depends(get_db)):
     response.headers["Content-Disposition"] = "attachment; filename=transactions.xlsx"
     return response
 
+@app.post("/api/retrain")
+async def retrain_model_manual(db: Session = Depends(get_db)):
+    """Ручной запуск дообучения"""
+    success = auto_retrain_if_needed(db)
+    
+    if success:
+        return {
+            "success": True,
+            "message": "Модель успешно дообучена"
+        }
+    else:
+        pending = db.query(TrainingFeedback).filter(
+            TrainingFeedback.used_for_training == False
+        ).count()
+        return {
+            "success": False,
+            "message": f"Недостаточно исправлений. Нужно минимум 5, есть {pending}",
+            "pending_count": pending
+        }
+
+
+def auto_retrain_if_needed(db: Session):
+    """Автоматическое дообучение после КАЖДОГО исправления"""
+    from database import SessionLocal
+    
+    # Получаем последнее неиспользованное исправление (используем НОВУЮ сессию)
+    new_db = SessionLocal()
+    try:
+        pending_feedback = new_db.query(TrainingFeedback).filter(
+            TrainingFeedback.used_for_training == False
+        ).order_by(TrainingFeedback.created_at.desc()).first()
+        
+        if pending_feedback is None:
+            return False
+        
+        print(f"\n🔄 Обнаружено новое исправление: '{pending_feedback.description}' → {pending_feedback.correct_category}")
+        
+        # Получаем ВСЕ неиспользованные исправления
+        all_pending = new_db.query(TrainingFeedback).filter(
+            TrainingFeedback.used_for_training == False
+        ).all()
+        
+        # Собираем данные для обучения
+        train_data = []
+        
+        # Добавляем исправления с высоким весом (10 копий)
+        for f in all_pending:
+            for _ in range(10):
+                train_data.append({
+                    'description': f.description,
+                    'category': f.correct_category,
+                    'amount': f.amount
+                })
+        
+        # Добавляем историю исправлений
+        old_feedbacks = new_db.query(TrainingFeedback).filter(
+            TrainingFeedback.used_for_training == True
+        ).order_by(TrainingFeedback.created_at.desc()).limit(200).all()
+        
+        for f in old_feedbacks:
+            for _ in range(3):
+                train_data.append({
+                    'description': f.description,
+                    'category': f.correct_category,
+                    'amount': f.amount
+                })
+        
+        # Добавляем минимум синтетических данных
+        print("   Добавление базовых синтетических данных...")
+        synthetic_df = ml_service._generate_enhanced_data(100)
+        for _, row in synthetic_df.iterrows():
+            train_data.append({
+                'description': row['description'],
+                'category': row['category'],
+                'amount': row['amount']
+            })
+        
+        print(f"   Всего примеров для обучения: {len(train_data)}")
+        
+        # Дообучаем модель
+        df = pd.DataFrame(train_data)
+        ml_service.train(df=df, use_synthetic=False)
+        ml_service.save_model('enhanced_model.pkl')
+        
+        # Очищаем кэш модели
+        ml_service.cache = {}
+        print("   Кэш модели очищен")
+        
+        # Отмечаем все неиспользованные исправления как использованные
+        for f in all_pending:
+            feedback = new_db.query(TrainingFeedback).filter(TrainingFeedback.id == f.id).first()
+            if feedback:
+                feedback.used_for_training = True
+        new_db.commit()
+        
+        print(f"✅ Модель дообучена! Теперь '{pending_feedback.description}' → '{pending_feedback.correct_category}'")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Ошибка дообучения: {e}")
+        new_db.rollback()
+        return False
+    finally:
+        new_db.close()
 
 if __name__ == "__main__":
     import uvicorn

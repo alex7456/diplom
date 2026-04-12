@@ -1,4 +1,4 @@
-<!-- index.html - с загрузкой банковских выписок и управлением данными -->
+<!-- index.html - с загрузкой банковских выписок, управлением данными и самообучением -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -141,6 +141,16 @@
             
             <div id="uploadResult" style="margin-top: 20px; display: none;"></div>
         </div>
+        
+        <div class="main-card">
+            <h2>🧠 Самообучение модели</h2>
+            <p>Модель автоматически дообучается после каждых 5 исправлений категорий в истории</p>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <button onclick="checkModelStatus()" style="background: #2196F3;">📊 Статус модели</button>
+                <button onclick="manualRetrain()" style="background: #9C27B0;">🔄 Принудительное дообучение</button>
+            </div>
+            <div id="modelStatus" style="margin-top: 15px;"></div>
+        </div>
     </div>
     
     <script>
@@ -273,7 +283,7 @@
             }
             
             let html = '<h3>Результаты пакетной обработки:</h3>';
-            html += 'table<thead><tr><th>Описание</th><th>Категория</th><th>Уверенность</th></tr></thead><tbody>';
+            html += '<table><tr><th>Описание</th><th>Категория</th><th>Уверенность</th></tr>';
             
             results.forEach(r => {
                 html += `
@@ -285,7 +295,7 @@
                 `;
             });
             
-            html += '</tbody></table>';
+            html += '</table>';
             resultDiv.innerHTML = html;
             loadStats();
         }
@@ -342,35 +352,90 @@
         }
         
         async function clearHistory() {
-    if (!confirm('⚠️ ВНИМАНИЕ! Это действие удалит ВСЕ транзакции без возможности восстановления. Вы уверены?')) {
-        return;
-    }
-    
-    if (!confirm('Последнее подтверждение: Удалить все данные навсегда?')) {
-        return;
-    }
-    
-    const resultDiv = document.getElementById('clearResult');
-    resultDiv.innerHTML = '<div class="loading"></div> Удаление...';
-    
-    try {
-        // Используем GET запрос
-        const response = await fetch('/api/transactions/clear-all');
-        const data = await response.json();
-        
-        if (response.ok) {
-            resultDiv.innerHTML = `<div class="success">✅ ${data.message}</div>`;
-            loadStats();
-            setTimeout(() => {
-                resultDiv.innerHTML = '';
-            }, 3000);
-        } else {
-            resultDiv.innerHTML = `<div class="error">Ошибка: ${data.detail || 'Неизвестная ошибка'}</div>`;
+            if (!confirm('⚠️ ВНИМАНИЕ! Это действие удалит ВСЕ транзакции без возможности восстановления. Вы уверены?')) {
+                return;
+            }
+            
+            if (!confirm('Последнее подтверждение: Удалить все данные навсегда?')) {
+                return;
+            }
+            
+            const resultDiv = document.getElementById('clearResult');
+            resultDiv.innerHTML = '<div class="loading"></div> Удаление...';
+            
+            try {
+                const response = await fetch('/api/transactions/clear-all');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✅ ${data.message}</div>`;
+                    loadStats();
+                    setTimeout(() => {
+                        resultDiv.innerHTML = '';
+                    }, 3000);
+                } else {
+                    resultDiv.innerHTML = `<div class="error">Ошибка: ${data.detail || 'Неизвестная ошибка'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
+            }
         }
-    } catch (error) {
-        resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
-    }
-}
+        
+        async function exportData() {
+            try {
+                window.location.href = '/api/export/csv';
+            } catch (error) {
+                alert('Ошибка экспорта: ' + error.message);
+            }
+        }
+        
+        async function checkModelStatus() {
+            const resultDiv = document.getElementById('modelStatus');
+            resultDiv.innerHTML = '<div class="loading"></div> Загрузка статуса...';
+            
+            try {
+                const response = await fetch('/api/feedback/count');
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="upload-stats">
+                        <h4>📊 Статус самообучения</h4>
+                        <p>✅ Всего исправлений: <strong>${data.total}</strong></p>
+                        <p>🔄 Ожидают дообучения: <strong>${data.pending}</strong></p>
+                        <p>🎓 Уже использовано: <strong>${data.used}</strong></p>
+                        <p>⚙️ Авто-дообучение: <strong>${data.pending >= 5 ? '✅ Активно (накоплено достаточно)' : '⏳ Ожидание (' + (5 - data.pending) + ' исправлений до авто-обучения)'}</strong></p>
+                        <p>💡 <strong>Совет:</strong> Исправляйте ошибки в истории транзакций — модель будет учиться!</p>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        async function manualRetrain() {
+            if (!confirm('Запустить принудительное дообучение модели на основе накопленных исправлений? Это может занять 10-20 секунд.')) {
+                return;
+            }
+            
+            const resultDiv = document.getElementById('modelStatus');
+            resultDiv.innerHTML = '<div class="loading"></div> Дообучение модели... (20-30 секунд)';
+            
+            try {
+                const response = await fetch('/api/retrain', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `<div class="success">✅ ${data.message}</div>`;
+                    setTimeout(() => {
+                        resultDiv.innerHTML = '';
+                    }, 5000);
+                } else {
+                    resultDiv.innerHTML = `<div class="error">⚠️ ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
+            }
+        }
         
         // Инициализация
         loadStats();
