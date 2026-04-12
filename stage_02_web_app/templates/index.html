@@ -1,445 +1,692 @@
-<!-- index.html - с загрузкой банковских выписок, управлением данными и самообучением -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expense Categorizer - Главная</title>
+    <title>Expense Categorizer</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #f5f5f5; }
-        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-size: 24px; font-weight: bold; }
-        .nav-links { display: flex; gap: 20px; align-items: center; }
-        .nav-links a { color: white; text-decoration: none; padding: 8px 16px; border-radius: 8px; }
-        .nav-links a:hover { background: rgba(255,255,255,0.2); }
-        .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
-        .main-card { background: white; border-radius: 20px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 30px; }
-        .input-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
-        input, textarea { width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px; }
-        input:focus, textarea:focus { outline: none; border-color: #667eea; }
-        button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 30px; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.2s; }
-        button:hover { transform: translateY(-2px); }
-        .btn-danger { background: #f44336; }
-        .btn-danger:hover { background: #d32f2f; }
-        .btn-success { background: #4CAF50; }
-        .btn-success:hover { background: #388E3C; }
-        .btn-secondary { background: #607D8B; }
-        .result-card { background: #f8f9fa; border-radius: 15px; padding: 20px; margin-top: 20px; display: none; }
-        .result-card.show { display: block; }
-        .category-badge { display: inline-block; padding: 8px 20px; border-radius: 20px; font-weight: bold; font-size: 1.2rem; margin: 10px 0; }
-        .category-Продукты { background: #4CAF50; color: white; }
-        .category-Транспорт { background: #2196F3; color: white; }
-        .category-Кафе { background: #FF9800; color: white; }
-        .category-Такси { background: #9C27B0; color: white; }
-        .category-Аптеки { background: #E91E63; color: white; }
-        .category-Связь { background: #00BCD4; color: white; }
-        .category-Коммунальные { background: #795548; color: white; }
-        .category-Развлечения { background: #F44336; color: white; }
-        .category-Одежда { background: #673AB7; color: white; }
-        .category-Переводы { background: #607D8B; color: white; }
-        .confidence-bar { background: #e0e0e0; border-radius: 10px; height: 20px; overflow: hidden; margin: 10px 0; }
-        .confidence-fill { background: linear-gradient(90deg, #667eea, #764ba2); height: 100%; transition: width 0.3s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; color: white; font-size: 12px; font-weight: bold; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px; }
-        .stat-card { background: white; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .stat-value { font-size: 2rem; font-weight: bold; color: #667eea; }
-        .stat-label { color: #666; margin-top: 5px; }
-        .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; animation: spin 1s linear infinite; margin-left: 10px; vertical-align: middle; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .error { color: #f44336; padding: 10px; background: #ffebee; border-radius: 10px; margin-top: 10px; }
-        .success { color: #4CAF50; padding: 10px; background: #e8f5e9; border-radius: 10px; margin-top: 10px; }
-        .batch-area { margin-top: 30px; padding-top: 30px; border-top: 2px solid #e0e0e0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e0e0e0; }
-        th { background: #f0f0f0; font-weight: 600; }
-        .upload-area { border: 2px dashed #e0e0e0; border-radius: 15px; padding: 30px; text-align: center; margin-top: 20px; cursor: pointer; }
-        .upload-area:hover { border-color: #667eea; background: #f8f9fa; }
-        .upload-progress { background: #e0e0e0; border-radius: 10px; height: 20px; overflow: hidden; margin: 10px 0; }
-        .upload-progress-fill { background: linear-gradient(90deg, #667eea, #764ba2); height: 100%; transition: width 0.3s ease; color: white; font-size: 11px; text-align: center; line-height: 20px; }
-        .upload-stats { background: #e3f2fd; padding: 15px; border-radius: 10px; margin-top: 10px; }
-        .file-info { font-size: 14px; color: #666; margin-top: 10px; }
-        .button-group { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 20px; }
-        .button-group button { margin: 0; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #eef2f7 100%);
+            color: #1e293b;
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 0 32px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.95);
+        }
+        
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .nav-links a {
+            color: #475569;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .nav-links a:hover {
+            background: #eef2ff;
+            color: #2563eb;
+        }
+        
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+        
+        .card {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 28px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+            border: 1px solid #e2e8f0;
+            transition: box-shadow 0.2s;
+        }
+        
+        .card:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #0f172a;
+            letter-spacing: -0.2px;
+            border-left: 3px solid #2563eb;
+            padding-left: 12px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        
+        textarea, input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 15px;
+            font-family: inherit;
+            transition: all 0.2s;
+            background: #fafbfc;
+        }
+        
+        textarea:focus, input:focus {
+            outline: none;
+            border-color: #2563eb;
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: linear-gradient(135deg, #1d4ed8, #1e40af);
+            transform: translateY(-1px);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+        
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+        
+        .btn-success:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #64748b, #475569);
+        }
+        
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #475569, #334155);
+        }
+        
+        .result-card {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .result-card.show {
+            display: block;
+        }
+        
+        .category-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 24px;
+            font-weight: 600;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        
+        .category-Продукты { background: #dcfce7; color: #166534; }
+        .category-Транспорт { background: #dbeafe; color: #1e40af; }
+        .category-Кафе { background: #fed7aa; color: #9a3412; }
+        .category-Такси { background: #f3e8ff; color: #6b21a5; }
+        .category-Аптеки { background: #fce7f3; color: #9d174d; }
+        .category-Связь { background: #cffafe; color: #0e7490; }
+        .category-Коммунальные { background: #fef3c7; color: #b45309; }
+        .category-Развлечения { background: #ffe4e6; color: #be123c; }
+        .category-Одежда { background: #e9d5ff; color: #5b21b6; }
+        .category-Переводы { background: #f1f5f9; color: #334155; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #f8fafc, #ffffff);
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            transition: transform 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #1e293b, #2563eb);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .action-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            margin-top: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #fafbfc;
+        }
+        
+        .upload-area:hover {
+            border-color: #2563eb;
+            background: #eef2ff;
+        }
+        
+        .upload-stats {
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 16px;
+            margin-top: 16px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .upload-stats h4 {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #0f172a;
+        }
+        
+        .upload-stats p {
+            font-size: 14px;
+            margin-bottom: 6px;
+            color: #334155;
+        }
+        
+        .upload-stats ul {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+        
+        .upload-stats li {
+            font-size: 13px;
+            color: #475569;
+            margin-bottom: 4px;
+        }
+        
+        .error {
+            color: #dc2626;
+            padding: 12px;
+            background: #fef2f2;
+            border-radius: 12px;
+            margin-top: 12px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .success {
+            color: #059669;
+            padding: 12px;
+            background: #ecfdf5;
+            border-radius: 12px;
+            margin-top: 12px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #e2e8f0;
+            border-top: 2px solid #2563eb;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .batch-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: 14px;
+        }
+        
+        .batch-table th,
+        .batch-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .batch-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #475569;
+        }
+        
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .container {
+                padding: 20px 16px;
+            }
+            .card {
+                padding: 20px;
+            }
+        }
     </style>
 </head>
 <body>
     <nav class="navbar">
-        <div class="logo">💰 Expense Categorizer</div>
+        <div class="logo">Expense Categorizer</div>
         <div class="nav-links">
-            <a href="/app">Главная</a>
+            <a href="/app">Транзакции</a>
             <a href="/dashboard">Аналитика</a>
             <a href="/history">История</a>
         </div>
     </nav>
     
     <div class="container">
-        <div class="main-card">
-            <h2>📝 Новая транзакция</h2>
-            
-            <div class="input-group">
-                <label>Описание транзакции *</label>
-                <textarea id="description" placeholder="Например: Пятерочка 1234 или Яндекс Такси поездка"></textarea>
+        <!-- Новая транзакция -->
+        <div class="card">
+            <div class="card-title">Новая транзакция</div>
+            <div class="form-group">
+                <label>Описание</label>
+                <textarea id="description" placeholder="Например: Пятерочка 1234"></textarea>
             </div>
-            
-            <div class="input-group">
-                <label>Сумма (₽) - опционально</label>
-                <input type="number" id="amount" step="0.01" placeholder="Отрицательная для расходов, положительная для доходов">
+            <div class="form-group">
+                <label>Сумма (опционально)</label>
+                <input type="number" id="amount" step="0.01" placeholder="Отрицательная для расходов">
             </div>
-            
-            <button onclick="predict()">🔮 Определить категорию</button>
-            
+            <button onclick="predict()">Определить категорию</button>
             <div id="result" class="result-card"></div>
         </div>
         
-        <div class="main-card">
-            <h2>📊 Статистика</h2>
+                <!-- Статистика -->
+        <div class="card">
+            <div class="card-title">Статистика</div>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-value" id="totalTransactions">-</div>
+                    <div class="stat-value" id="totalTransactions">—</div>
                     <div class="stat-label">Всего транзакций</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="totalExpenses">-</div>
+                    <div class="stat-value" id="totalExpenses">—</div>
                     <div class="stat-label">Расходов (₽)</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="avgConfidence">-</div>
-                    <div class="stat-label">Ср. уверенность</div>
+                    <div class="stat-value" id="totalIncome">—</div>
+                    <div class="stat-label">Доходов (₽)</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="correctedCount">-</div>
-                    <div class="stat-label">Исправлено</div>
+                    <div class="stat-value" id="correctedCount">—</div>
+                    <div class="stat-label">Исправлений</div>
                 </div>
             </div>
-            
-            <div class="button-group">
-                <button onclick="clearHistory()" class="btn-danger">🗑️ Очистить всю историю</button>
-                <button onclick="exportData()" class="btn-success">📥 Экспорт данных (CSV)</button>
-                <button onclick="location.reload()" class="btn-secondary">🔄 Обновить страницу</button>
+            <div class="action-group">
+                <button onclick="clearHistory()" class="btn-danger">Очистить историю</button>
+                <button onclick="exportData()" class="btn-success">Экспорт Excel</button>
+                <button onclick="location.reload()" class="btn-secondary">Обновить</button>
             </div>
-            <div id="clearResult" style="margin-top: 15px;"></div>
+            <div id="clearResult"></div>
         </div>
         
-        <div class="main-card batch-area">
-            <h2>📁 Пакетная обработка</h2>
-            <p>Введите несколько транзакций (по одной на строку)</p>
-            <textarea id="batchText" rows="3" placeholder="Пятерочка&#10;Яндекс Такси&#10;Макдоналдс&#10;Аптека 36.6"></textarea>
-            <button onclick="batchPredict()">🚀 Обработать все</button>
+        <!-- Пакетная обработка -->
+        <div class="card">
+            <div class="card-title">Пакетная обработка</div>
+            <div class="form-group">
+                <label>Формат ввода</label>
+                <div style="font-size: 13px; color: #64748b; margin-bottom: 12px;">
+                    Расширенный режим: <strong>Описание: сумма</strong> (расходы с минусом, доходы с плюсом)
+                </div>
+                <textarea id="batchText" rows="4" placeholder="Пятерочка: -450&#10;Яндекс Такси: -300&#10;Макдоналдс: -550&#10;Зарплата: +50000"></textarea>
+            </div>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
+                <button onclick="parseAndPreview()">Предпросмотр</button>
+                <button onclick="loadFromClipboard()" class="btn-secondary">Вставить из буфера</button>
+            </div>
+            <div id="previewContainer" style="display: none;">
+                <div style="margin: 16px 0 12px 0; font-weight: 600;">Предпросмотр</div>
+                <div style="overflow-x: auto;">
+                    <table class="batch-table">
+                        <thead>
+                            <tr><th style="width: 40px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th><th>Описание</th><th style="width: 120px;">Сумма</th><th style="width: 140px;">Категория</th><th style="width: 80px;">Действия</th></tr>
+                        </thead>
+                        <tbody id="previewBody"></tbody>
+                    </table>
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 16px;">
+                    <button onclick="saveSelected()">Сохранить выбранные</button>
+                    <button onclick="saveAll()" class="btn-success">Сохранить все</button>
+                    <button onclick="clearPreview()" class="btn-secondary">Очистить</button>
+                </div>
+            </div>
             <div id="batchResult"></div>
         </div>
         
-        <div class="main-card">
-            <h2>📂 Загрузка выписки из банка</h2>
-            <p>Поддерживаются форматы: Excel (XLSX) и CSV</p>
-            
+        <!-- Загрузка выписки -->
+        <div class="card">
+            <div class="card-title">Загрузка выписки</div>
             <div class="upload-area" onclick="document.getElementById('bankFile').click()">
-                <div>📄 Нажмите или перетащите файл сюда</div>
-                <div class="file-info">Поддерживаются: .csv, .xlsx, .xls</div>
+                <div style="font-weight: 500;">Выберите файл или перетащите его сюда</div>
+                <div style="font-size: 13px; color: #64748b; margin-top: 8px;">Поддерживаются: .xlsx, .xls, .csv</div>
                 <input type="file" id="bankFile" accept=".csv,.xlsx,.xls" style="display: none" onchange="uploadBankStatement()">
             </div>
-            
             <div id="uploadResult" style="margin-top: 20px; display: none;"></div>
-        </div>
-        
-        <div class="main-card">
-            <h2>🧠 Самообучение модели</h2>
-            <p>Модель автоматически дообучается после каждых 5 исправлений категорий в истории</p>
-            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                <button onclick="checkModelStatus()" style="background: #2196F3;">📊 Статус модели</button>
-                <button onclick="manualRetrain()" style="background: #9C27B0;">🔄 Принудительное дообучение</button>
-            </div>
-            <div id="modelStatus" style="margin-top: 15px;"></div>
         </div>
     </div>
     
     <script>
-        async function loadStats() {
+        let previewData = [];
+        
+                async function loadStats() {
             try {
                 const response = await fetch('/api/stats');
                 if (response.ok) {
                     const stats = await response.json();
                     document.getElementById('totalTransactions').textContent = stats.total_transactions || 0;
                     document.getElementById('totalExpenses').textContent = Math.round(stats.total_expenses || 0).toLocaleString();
-                    document.getElementById('avgConfidence').textContent = `${Math.round((stats.avg_confidence || 0) * 100)}%`;
+                    document.getElementById('totalIncome').textContent = Math.round(stats.total_income || 0).toLocaleString();
                     document.getElementById('correctedCount').textContent = stats.corrected_count || 0;
                 }
-            } catch (error) {
-                console.error('Error loading stats:', error);
-            }
+            } catch (error) { console.error(error); }
         }
         
         async function predict() {
             const description = document.getElementById('description').value;
             const amount = document.getElementById('amount').value;
-            
-            if (!description.trim()) {
-                alert('Введите описание транзакции');
-                return;
-            }
-            
+            if (!description.trim()) { alert('Введите описание'); return; }
             const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = '<div class="loading"></div> Анализируем...';
+            resultDiv.innerHTML = '<div class="loading"></div> Анализ...';
             resultDiv.classList.add('show');
-            
             try {
                 const formData = new URLSearchParams();
                 formData.append('description', description);
                 if (amount) formData.append('amount', amount);
-                
-                const response = await fetch('/api/predict', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: formData
-                });
-                
+                const response = await fetch('/api/predict', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formData });
                 const data = await response.json();
-                
                 if (response.ok) {
-                    const confidencePercent = (data.confidence * 100).toFixed(1);
-                    
                     resultDiv.innerHTML = `
-                        <h3>✅ Транзакция сохранена!</h3>
-                        <div class="category-badge category-${data.predicted_category}">
-                            ${data.predicted_category}
+                        <div style="font-weight: 600; margin-bottom: 12px;">Транзакция сохранена</div>
+                        <div class="category-badge category-${data.predicted_category}">${data.predicted_category}</div>
+                        <div style="margin-top: 12px; font-size: 14px; color: #334155;">
+                            <div>Описание: ${escapeHtml(data.description)}</div>
+                            ${data.amount ? `<div>Сумма: ${data.amount} ₽</div>` : ''}
                         </div>
-                        <div class="confidence-bar">
-                            <div class="confidence-fill" style="width: ${confidencePercent}%">
-                                ${confidencePercent}%
-                            </div>
-                        </div>
-                        <p><strong>Описание:</strong> ${escapeHtml(data.description)}</p>
-                        ${data.amount ? `<p><strong>Сумма:</strong> ${data.amount} ₽</p>` : ''}
-                        <p><strong>Время обработки:</strong> ${data.processing_time_ms} мс</p>
                     `;
-                    
                     document.getElementById('description').value = '';
                     document.getElementById('amount').value = '';
                     loadStats();
-                } else {
-                    resultDiv.innerHTML = `<div class="error">Ошибка: ${data.detail || 'Неизвестная ошибка'}</div>`;
+                } else { resultDiv.innerHTML = `<div class="error">Ошибка: ${data.detail}</div>`; }
+            } catch (error) { resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`; }
+        }
+        
+        function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+        
+        function parseAndPreview() {
+            const text = document.getElementById('batchText').value;
+            const lines = text.split('\n').filter(line => line.trim());
+            previewData = [];
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                let description = trimmed;
+                let amount = null;
+                if (trimmed.includes(':')) {
+                    const colonIndex = trimmed.indexOf(':');
+                    description = trimmed.substring(0, colonIndex).trim();
+                    const amountStr = trimmed.substring(colonIndex + 1).trim();
+                    amount = parseFloat(amountStr);
+                    if (isNaN(amount)) amount = null;
                 }
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
+                previewData.push({ id: Date.now() + Math.random(), description, amount, category: null, confidence: null, selected: true });
             }
+            if (previewData.length === 0) { alert('Нет данных для обработки'); return; }
+            awaitPredictions();
         }
         
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        async function batchPredict() {
-            const batchText = document.getElementById('batchText').value;
-            const lines = batchText.split('\n').filter(line => line.trim());
-            
-            if (lines.length === 0) {
-                alert('Введите хотя бы одну транзакцию');
-                return;
-            }
-            
-            const resultDiv = document.getElementById('batchResult');
-            resultDiv.innerHTML = '<div class="loading"></div> Обработка...';
-            
-            const results = [];
-            
-            for (const desc of lines) {
+        async function awaitPredictions() {
+            const container = document.getElementById('previewContainer');
+            const body = document.getElementById('previewBody');
+            container.style.display = 'block';
+            body.innerHTML = '<tr><td colspan="5" style="text-align: center;"><div class="loading"></div> Анализ...<\/td></tr>';
+            for (let i = 0; i < previewData.length; i++) {
+                const item = previewData[i];
                 try {
                     const formData = new URLSearchParams();
-                    formData.append('description', desc.trim());
-                    
-                    const response = await fetch('/api/predict', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: formData
-                    });
-                    
+                    formData.append('description', item.description);
+                    if (item.amount) formData.append('amount', item.amount);
+                    const response = await fetch('/api/predict', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formData });
                     const data = await response.json();
                     if (response.ok) {
-                        results.push({
-                            description: desc.trim(),
-                            category: data.predicted_category,
-                            confidence: (data.confidence * 100).toFixed(1)
-                        });
-                    } else {
-                        results.push({
-                            description: desc.trim(),
-                            category: 'Ошибка',
-                            confidence: '0'
-                        });
-                    }
-                } catch (error) {
-                    results.push({
-                        description: desc.trim(),
-                        category: 'Ошибка',
-                        confidence: '0'
-                    });
-                }
+                        item.category = data.predicted_category;
+                        item.confidence = (data.confidence * 100).toFixed(1);
+                    } else { item.category = 'Ошибка'; item.confidence = '0'; }
+                } catch (error) { item.category = 'Ошибка'; item.confidence = '0'; }
             }
-            
-            let html = '<h3>Результаты пакетной обработки:</h3>';
-            html += '<table><tr><th>Описание</th><th>Категория</th><th>Уверенность</th></tr>';
-            
-            results.forEach(r => {
-                html += `
-                    <tr>
-                        <td>${escapeHtml(r.description)}</td>
-                        <td><span class="category-badge category-${r.category}" style="font-size: 0.9rem; padding: 4px 12px;">${r.category}</span></td>
-                        <td>${r.confidence}%</td>
-                    </tr>
+            renderPreviewTable();
+        }
+        
+        function renderPreviewTable() {
+            const body = document.getElementById('previewBody');
+            body.innerHTML = '';
+            for (let i = 0; i < previewData.length; i++) {
+                const item = previewData[i];
+                const row = body.insertRow();
+                row.innerHTML = `
+                    <td><input type="checkbox" class="row-select" data-index="${i}" ${item.selected ? 'checked' : ''} onchange="toggleSelectRow(${i})"><\/td>
+                    <td><input type="text" value="${escapeHtml(item.description)}" style="width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 8px;" onchange="updateDescription(${i}, this.value)"><\/td>
+                    <td><input type="number" value="${item.amount !== null ? item.amount : ''}" step="0.01" style="width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 8px;" onchange="updateAmount(${i}, this.value)"><\/td>
+                    <td><select onchange="updateCategory(${i}, this.value)" style="width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 8px;">${generateCategoryOptions(item.category)}<\/select><\/td>
+                    <td><button onclick="removeRow(${i})" style="background: #ef4444; padding: 4px 12px;">Удалить<\/button><\/td>
                 `;
-            });
-            
-            html += '</table>';
-            resultDiv.innerHTML = html;
+            }
+        }
+        
+        function generateCategoryOptions(selected) {
+            const categories = ['Продукты', 'Транспорт', 'Кафе', 'Такси', 'Аптеки', 'Связь', 'Коммунальные', 'Развлечения', 'Одежда', 'Переводы'];
+            let html = '';
+            for (const cat of categories) html += `<option value="${cat}" ${selected === cat ? 'selected' : ''}>${cat}</option>`;
+            return html;
+        }
+        
+        function updateDescription(index, value) { previewData[index].description = value; }
+        function updateAmount(index, value) { previewData[index].amount = value ? parseFloat(value) : null; }
+        function updateCategory(index, value) { previewData[index].category = value; }
+        
+        function toggleSelectRow(index) {
+            previewData[index].selected = !previewData[index].selected;
+            const selectAll = document.getElementById('selectAll');
+            if (selectAll) selectAll.checked = previewData.every(item => item.selected);
+        }
+        
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll');
+            for (let i = 0; i < previewData.length; i++) previewData[i].selected = selectAll.checked;
+            renderPreviewTable();
+        }
+        
+        function removeRow(index) {
+            previewData.splice(index, 1);
+            if (previewData.length === 0) document.getElementById('previewContainer').style.display = 'none';
+            else renderPreviewTable();
+        }
+        
+        async function saveSelected() { await saveTransactions(previewData.filter(item => item.selected)); }
+        async function saveAll() { await saveTransactions(previewData); }
+        
+        async function saveTransactions(transactions) {
+            if (transactions.length === 0) { alert('Нет транзакций'); return; }
+            const resultDiv = document.getElementById('batchResult');
+            resultDiv.innerHTML = '<div class="loading"></div> Сохранение...';
+            let saved = 0, errors = 0;
+            for (const trans of transactions) {
+                try {
+                    const formData = new URLSearchParams();
+                    formData.append('description', trans.description);
+                    if (trans.amount) formData.append('amount', trans.amount);
+                    const response = await fetch('/api/predict', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formData });
+                    if (response.ok) saved++; else errors++;
+                } catch (error) { errors++; }
+            }
+            resultDiv.innerHTML = `<div class="success">Сохранено: ${saved}, ошибок: ${errors}</div>`;
             loadStats();
+            setTimeout(() => resultDiv.innerHTML = '', 3000);
+        }
+        
+        function clearPreview() { previewData = []; document.getElementById('previewContainer').style.display = 'none'; document.getElementById('batchText').value = ''; }
+        
+        async function loadFromClipboard() {
+            try { const text = await navigator.clipboard.readText(); document.getElementById('batchText').value = text; parseAndPreview(); } 
+            catch (err) { alert('Не удалось прочитать буфер обмена'); }
         }
         
         async function uploadBankStatement() {
             const fileInput = document.getElementById('bankFile');
             const file = fileInput.files[0];
-            
             if (!file) return;
-            
             const resultDiv = document.getElementById('uploadResult');
             resultDiv.style.display = 'block';
-            resultDiv.innerHTML = '<div class="loading"></div> Загрузка и обработка файла...';
-            
+            resultDiv.innerHTML = '<div class="loading"></div> Загрузка...';
             const formData = new FormData();
             formData.append('file', file);
-            
             try {
-                const response = await fetch('/api/upload-bank-statement', {
-                    method: 'POST',
-                    body: formData
-                });
-                
+                const response = await fetch('/api/upload-bank-statement', { method: 'POST', body: formData });
                 const data = await response.json();
-                
                 if (response.ok) {
-                    let html = `
-                        <div class="upload-stats">
-                            <h4>✅ Загрузка завершена!</h4>
-                            <p>📊 Обработано транзакций: <strong>${data.total}</strong></p>
-                            <p>💰 Общая сумма расходов: <strong>${Math.abs(data.total_expenses || 0).toLocaleString()} ₽</strong></p>
-                            <p>📁 Файл: ${escapeHtml(data.filename)}</p>
-                    `;
-                    
+                    let html = `<div class="upload-stats"><h4>Загрузка завершена</h4><p>Обработано: ${data.total} транзакций</p><p>Сумма расходов: ${Math.abs(data.total_expenses || 0).toLocaleString()} ₽</p>`;
                     if (data.category_stats && Object.keys(data.category_stats).length > 0) {
-                        html += `<p><strong>📈 Распределение по категориям:</strong></p><ul>`;
-                        for (const [cat, count] of Object.entries(data.category_stats)) {
-                            html += `<li>${cat}: ${count} транзакций</li>`;
-                        }
+                        html += `<p>Распределение по категориям:</p><ul>`;
+                        for (const [cat, count] of Object.entries(data.category_stats)) html += `<li>${cat}: ${count} транзакций</li>`;
                         html += `</ul>`;
                     }
-                    
-                    html += `<button onclick="location.reload()" style="margin-top: 15px;">🔄 Обновить страницу</button></div>`;
+                    html += `<button onclick="location.reload()" style="margin-top: 12px;">Обновить</button></div>`;
                     resultDiv.innerHTML = html;
                     loadStats();
-                } else {
-                    resultDiv.innerHTML = `<div class="error">Ошибка: ${data.detail || 'Неизвестная ошибка'}</div>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
-            }
-            
+                } else { resultDiv.innerHTML = `<div class="error">Ошибка: ${data.detail}</div>`; }
+            } catch (error) { resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`; }
             fileInput.value = '';
         }
         
         async function clearHistory() {
-            if (!confirm('⚠️ ВНИМАНИЕ! Это действие удалит ВСЕ транзакции без возможности восстановления. Вы уверены?')) {
-                return;
-            }
-            
-            if (!confirm('Последнее подтверждение: Удалить все данные навсегда?')) {
-                return;
-            }
-            
+            if (!confirm('Удалить все транзакции? Это действие необратимо.')) return;
             const resultDiv = document.getElementById('clearResult');
             resultDiv.innerHTML = '<div class="loading"></div> Удаление...';
-            
             try {
                 const response = await fetch('/api/transactions/clear-all');
                 const data = await response.json();
-                
                 if (response.ok) {
-                    resultDiv.innerHTML = `<div class="success">✅ ${data.message}</div>`;
+                    resultDiv.innerHTML = `<div class="success">${data.message}</div>`;
                     loadStats();
-                    setTimeout(() => {
-                        resultDiv.innerHTML = '';
-                    }, 3000);
-                } else {
-                    resultDiv.innerHTML = `<div class="error">Ошибка: ${data.detail || 'Неизвестная ошибка'}</div>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
-            }
+                    setTimeout(() => resultDiv.innerHTML = '', 3000);
+                } else { resultDiv.innerHTML = `<div class="error">Ошибка: ${data.detail}</div>`; }
+            } catch (error) { resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`; }
         }
         
-        async function exportData() {
-            try {
-                window.location.href = '/api/export/csv';
-            } catch (error) {
-                alert('Ошибка экспорта: ' + error.message);
-            }
+                async function exportData() { 
+            try { 
+                window.location.href = '/api/export/excel'; 
+            } catch (error) { 
+                alert('Ошибка экспорта'); 
+            } 
         }
         
-        async function checkModelStatus() {
-            const resultDiv = document.getElementById('modelStatus');
-            resultDiv.innerHTML = '<div class="loading"></div> Загрузка статуса...';
-            
-            try {
-                const response = await fetch('/api/feedback/count');
-                const data = await response.json();
-                
-                resultDiv.innerHTML = `
-                    <div class="upload-stats">
-                        <h4>📊 Статус самообучения</h4>
-                        <p>✅ Всего исправлений: <strong>${data.total}</strong></p>
-                        <p>🔄 Ожидают дообучения: <strong>${data.pending}</strong></p>
-                        <p>🎓 Уже использовано: <strong>${data.used}</strong></p>
-                        <p>⚙️ Авто-дообучение: <strong>${data.pending >= 5 ? '✅ Активно (накоплено достаточно)' : '⏳ Ожидание (' + (5 - data.pending) + ' исправлений до авто-обучения)'}</strong></p>
-                        <p>💡 <strong>Совет:</strong> Исправляйте ошибки в истории транзакций — модель будет учиться!</p>
-                    </div>
-                `;
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
-            }
-        }
-        
-        async function manualRetrain() {
-            if (!confirm('Запустить принудительное дообучение модели на основе накопленных исправлений? Это может занять 10-20 секунд.')) {
-                return;
-            }
-            
-            const resultDiv = document.getElementById('modelStatus');
-            resultDiv.innerHTML = '<div class="loading"></div> Дообучение модели... (20-30 секунд)';
-            
-            try {
-                const response = await fetch('/api/retrain', { method: 'POST' });
-                const data = await response.json();
-                
-                if (data.success) {
-                    resultDiv.innerHTML = `<div class="success">✅ ${data.message}</div>`;
-                    setTimeout(() => {
-                        resultDiv.innerHTML = '';
-                    }, 5000);
-                } else {
-                    resultDiv.innerHTML = `<div class="error">⚠️ ${data.message}</div>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
-            }
-        }
-        
-        // Инициализация
         loadStats();
-        setInterval(loadStats, 10000);
+        setInterval(loadStats, 30000);
     </script>
 </body>
 </html>
