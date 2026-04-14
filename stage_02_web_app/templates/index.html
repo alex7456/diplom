@@ -367,6 +367,10 @@
             font-weight: 600;
             color: #475569;
         }
+        .nav-links a.active {
+    background: #eef2ff;
+    color: #2563eb;
+}
         
         @media (max-width: 768px) {
             .stats-grid {
@@ -388,6 +392,7 @@
             <a href="/app">Транзакции</a>
             <a href="/dashboard">Аналитика</a>
             <a href="/history">История</a>
+            <a href="/statements">Выписки</a>
         </div>
     </nav>
     
@@ -469,16 +474,7 @@
             <div id="batchResult"></div>
         </div>
         
-        <!-- Загрузка выписки -->
-        <div class="card">
-            <div class="card-title">Загрузка выписки</div>
-            <div class="upload-area" onclick="document.getElementById('bankFile').click()">
-                <div style="font-weight: 500;">Выберите файл или перетащите его сюда</div>
-                <div style="font-size: 13px; color: #64748b; margin-top: 8px;">Поддерживаются: .xlsx, .xls, .csv</div>
-                <input type="file" id="bankFile" accept=".csv,.xlsx,.xls" style="display: none" onchange="uploadBankStatement()">
-            </div>
-            <div id="uploadResult" style="margin-top: 20px; display: none;"></div>
-        </div>
+       
     </div>
     
     <script>
@@ -496,7 +492,19 @@
                 }
             } catch (error) { console.error(error); }
         }
-        
+        // Подсветка активной вкладки
+function setActiveNav() {
+    const currentPath = window.location.pathname;
+    document.querySelectorAll('.nav-links a').forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === currentPath) {
+            link.classList.add('active');
+        }
+    });
+}
+
+// Вызовите после загрузки страницы
+setActiveNav();
         async function predict() {
             const description = document.getElementById('description').value;
             const amount = document.getElementById('amount').value;

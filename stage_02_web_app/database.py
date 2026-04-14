@@ -5,7 +5,7 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 import json
 
@@ -26,9 +26,6 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
-    
-    # Связи
-    transactions = None  # будет настроено после определения Transaction
 
 
 class Transaction(Base):
@@ -40,7 +37,7 @@ class Transaction(Base):
     description = Column(String, nullable=False)
     amount = Column(Float, nullable=True)
     predicted_category = Column(String, nullable=False)
-    user_category = Column(String, nullable=True)  # ручная коррекция
+    user_category = Column(String, nullable=True)
     confidence = Column(Float, nullable=False)
     processing_time_ms = Column(Float, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -48,11 +45,12 @@ class Transaction(Base):
     notes = Column(Text, nullable=True)
     
     def get_final_category(self) -> str:
-        """Возвращает финальную категорию (пользовательскую или предсказанную)"""
         return self.user_category if self.user_category else self.predicted_category
     
     def to_dict(self) -> dict:
-        """Преобразование в словарь"""
+        """Преобразование в словарь с локальным временем"""
+    # Преобразуем UTC в локальное время (Москва UTC+3)
+        local_time = self.created_at + timedelta(hours=3)
         return {
             'id': self.id,
             'description': self.description,
@@ -61,9 +59,9 @@ class Transaction(Base):
             'predicted_category': self.predicted_category,
             'user_category': self.user_category,
             'confidence': self.confidence,
-            'date': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'date': local_time.strftime('%Y-%m-%d %H:%M:%S'),
             'notes': self.notes
-        }
+    }
 
 
 class TrainingFeedback(Base):
@@ -86,9 +84,6 @@ User.feedbacks = relationship("TrainingFeedback", back_populates="user", cascade
 Transaction.user = relationship("User", back_populates="transactions")
 TrainingFeedback.user = relationship("User", back_populates="feedbacks")
 
-# Импорт для relationship
-from sqlalchemy.orm import relationship
-
 
 def create_tables():
     """Создание всех таблиц в базе данных"""
@@ -104,7 +99,6 @@ def get_db():
         db.close()
 
 
-# Класс для работы с транзакциями пользователя
 class TransactionRepository:
     """Репозиторий для работы с транзакциями"""
     
@@ -112,7 +106,8 @@ class TransactionRepository:
         self.db = db
     
     def create(self, user_id: int, description: str, predicted_category: str, 
-               confidence: float, amount: float = None, processing_time_ms: float = 0) -> Transaction:
+               confidence: float, amount: float = None, processing_time_ms: float = 0, 
+               is_auto: bool = True) -> Transaction:
         """Создание новой транзакции"""
         transaction = Transaction(
             user_id=user_id,
@@ -120,7 +115,8 @@ class TransactionRepository:
             amount=amount,
             predicted_category=predicted_category,
             confidence=confidence,
-            processing_time_ms=processing_time_ms
+            processing_time_ms=processing_time_ms,
+            is_auto=is_auto
         )
         self.db.add(transaction)
         self.db.commit()
@@ -131,6 +127,14 @@ class TransactionRepository:
         """Получение транзакций пользователя"""
         return self.db.query(Transaction).filter(
             Transaction.user_id == user_id
+        ).order_by(Transaction.created_at.desc()).offset(offset).limit(limit).all()
+    
+    def get_user_transactions_by_source(self, user_id: int, limit: int = 100, offset: int = 0, is_auto:
+    bool = True) -> List[Transaction]:
+        """Получение транзакций пользователя по источнику (ручной ввод или выписка)"""
+        return self.db.query(Transaction).filter(
+            Transaction.user_id == user_id,
+            Transaction.is_auto == is_auto
         ).order_by(Transaction.created_at.desc()).offset(offset).limit(limit).all()
     
     def update_category(self, transaction_id: int, user_id: int, new_category: str) -> Optional[Transaction]:
@@ -171,8 +175,17 @@ class TransactionRepository:
         return False
     
     def get_statistics(self, user_id: int) -> dict:
-        """Получение статистики по транзакциям пользователя"""
-        transactions = self.db.query(Transaction).filter(Transaction.user_id == user_id).all()
+        """Получение статистики по ВСЕМ транзакциям"""
+        return self.get_statistics_by_source(user_id, is_auto=None)
+    
+    def get_statistics_by_source(self, user_id: int, is_auto: bool = None) -> dict:
+        """Получение статистики по источнику (ручной ввод или выписка)"""
+        query = self.db.query(Transaction).filter(Transaction.user_id == user_id)
+        
+        if is_auto is not None:
+            query = query.filter(Transaction.is_auto == is_auto)
+        
+        transactions = query.all()
         
         total_expenses = sum(abs(t.amount) for t in transactions if t.amount and t.amount < 0)
         total_income = sum(t.amount for t in transactions if t.amount and t.amount > 0)

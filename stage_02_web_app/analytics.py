@@ -23,7 +23,7 @@ class AnalyticsService:
         transactions = self.db.query(Transaction).filter(
             Transaction.user_id == user_id,
             Transaction.created_at >= since_date,
-            Transaction.amount < 0  # только расходы
+            Transaction.amount < 0
         ).all()
         
         category_expenses = defaultdict(float)
@@ -47,7 +47,6 @@ class AnalyticsService:
             category = t.get_final_category()
             monthly_data[month_key][category] += abs(t.amount)
         
-        # Берём последние N месяцев
         sorted_months = sorted(monthly_data.keys())[-months:]
         
         result = {}
@@ -66,7 +65,6 @@ class AnalyticsService:
         merchant_stats = defaultdict(lambda: {'total': 0, 'count': 0})
         
         for t in transactions:
-            # Берём первое слово как "магазин"
             merchant = t.description.split()[0] if t.description else "unknown"
             merchant_stats[merchant]['total'] += abs(t.amount)
             merchant_stats[merchant]['count'] += 1
@@ -125,7 +123,7 @@ class AnalyticsService:
         
         stats['total_expenses'] = total_expenses
         stats['total_transactions'] = len(transactions)
-        stats['average_per_transaction'] = total_expenses / len(transactions)
+        stats['average_per_transaction'] = total_expenses / len(transactions) if transactions else 0
         
         for cat, data in category_data.items():
             stats['categories'][cat] = {
@@ -158,3 +156,61 @@ class AnalyticsService:
             })
         
         return pd.DataFrame(data)
+    
+    def get_analytics_by_source(self, user_id: int, is_auto: bool) -> dict:
+        """Аналитика по источнику данных (ручной ввод или выписка)"""
+        transactions = self.db.query(Transaction).filter(
+            Transaction.user_id == user_id,
+            Transaction.is_auto == is_auto
+        ).all()
+        
+        total_expenses = sum(abs(t.amount) for t in transactions if t.amount and t.amount < 0)
+        total_income = sum(t.amount for t in transactions if t.amount and t.amount > 0)
+        
+        category_stats = {}
+        for t in transactions:
+            if t.amount and t.amount < 0:
+                category = t.get_final_category()
+                amount = abs(t.amount)
+                if category not in category_stats:
+                    category_stats[category] = {'count': 0, 'total': 0}
+                category_stats[category]['count'] += 1
+                category_stats[category]['total'] += amount
+        
+        # Динамика по месяцам
+        monthly = {}
+        for t in transactions:
+            if t.amount and t.amount < 0:
+                month_key = t.created_at.strftime('%Y-%m')
+                category = t.get_final_category()
+                if month_key not in monthly:
+                    monthly[month_key] = {}
+                monthly[month_key][category] = monthly[month_key].get(category, 0) + abs(t.amount)
+        
+        # Топ магазинов (для выписок)
+        top_merchants = []
+        if not is_auto:
+            merchant_stats = {}
+            for t in transactions:
+                if t.amount and t.amount < 0:
+                    merchant = t.description.split()[0] if t.description else "unknown"
+                    merchant_stats[merchant] = merchant_stats.get(merchant, 0) + abs(t.amount)
+            top_merchants = [{"name": k, "total": v} for k, v in sorted(merchant_stats.items(), key=lambda x: x[1], reverse=True)[:8]]
+        
+        # Ежедневные расходы (для выписок)
+        daily = {}
+        if not is_auto:
+            for t in transactions:
+                if t.amount and t.amount < 0:
+                    day_key = t.created_at.strftime('%Y-%m-%d')
+                    daily[day_key] = daily.get(day_key, 0) + abs(t.amount)
+        
+        return {
+            'total_expenses': total_expenses,
+            'total_income': total_income,
+            'total_transactions': len(transactions),
+            'categories': category_stats,
+            'monthly': monthly,
+            'top_merchants': top_merchants,
+            'daily': daily
+        }

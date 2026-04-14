@@ -14,7 +14,7 @@ import pandas as pd
 from io import StringIO, BytesIO
 from collections import defaultdict
 
-from database import TrainingFeedback, create_tables, get_db, TransactionRepository
+from database import TrainingFeedback, Transaction, create_tables, get_db, TransactionRepository
 from ml_service import EnhancedExpenseClassifier
 from analytics import AnalyticsService
 
@@ -124,7 +124,8 @@ async def predict_transaction(
         amount=amount,
         predicted_category=category,
         confidence=confidence,
-        processing_time_ms=processing_time
+        processing_time_ms=processing_time,
+        is_auto=True
     )
     
     return {
@@ -135,7 +136,6 @@ async def predict_transaction(
         "confidence": confidence,
         "processing_time_ms": processing_time
     }
-
 
 @app.post("/api/upload-bank-statement")
 async def upload_bank_statement(
@@ -249,9 +249,9 @@ async def upload_bank_statement(
                 break
     
     # Обработка транзакций
-    repo = TransactionRepository(db)
     processed = 0
     total_expenses = 0
+    total_income = 0  # <--- ДОБАВЬТЕ ЭТУ СТРОКУ
     category_stats = defaultdict(int)
     errors = []
     
@@ -271,20 +271,12 @@ async def upload_bank_statement(
             if any(word in description.lower() for word in skip_words):
                 continue
             
-            # Получаем сумму
+            # Получаем сумму (НЕ МЕНЯЕМ ЗНАК!)
             amount = None
             if amount_col and pd.notna(row[amount_col]):
                 try:
                     amount = float(row[amount_col])
-                    
-                    # Определяем знак суммы по названию колонки
-                    if 'списано' in str(amount_col).lower() or 'расход' in str(amount_col).lower():
-                        amount = -abs(amount)
-                    elif 'зачислено' in str(amount_col).lower() or 'доход' in str(amount_col).lower():
-                        amount = abs(amount)
-                    # Если сумма положительная, предполагаем что это расход (по умолчанию)
-                    elif amount > 0:
-                        amount = -amount
+                    # НЕ МЕНЯЕМ ЗНАК! Если в файле -500 → расход, если 39927 → доход
                 except:
                     amount = None
             
@@ -292,22 +284,32 @@ async def upload_bank_statement(
             category, confidence = ml_service.predict(description, amount)
             
             # Сохраняем в БД
-            repo.create(
+            transaction = Transaction(
                 user_id=1,
                 description=description[:500],
                 amount=amount if amount else None,
                 predicted_category=category,
                 confidence=confidence,
-                processing_time_ms=0
+                processing_time_ms=0,
+                is_auto=False,
+                created_at=datetime.now()
             )
+            db.add(transaction)
             processed += 1
-            if amount and amount < 0:
-                total_expenses += abs(amount)
+            
+            if amount:
+                if amount < 0:
+                    total_expenses += abs(amount)
+                elif amount > 0:
+                    total_income += amount  # <--- ДОБАВЬТЕ ЭТУ СТРОКУ
+            
             category_stats[category] += 1
             
         except Exception as e:
             errors.append(f"Строка {idx}: {str(e)[:100]}")
             continue
+    
+    db.commit()
     
     if processed == 0:
         return JSONResponse(
@@ -319,6 +321,7 @@ async def upload_bank_statement(
         "success": True,
         "total": processed,
         "total_expenses": total_expenses,
+        "total_income": total_income,  # <--- ДОБАВЬТЕ ЭТУ СТРОКУ
         "category_stats": dict(category_stats),
         "filename": file.filename,
         "errors": errors[:5] if errors else []
@@ -331,9 +334,10 @@ async def get_transactions(
     offset: int = 0,
     db: Session = Depends(get_db)
 ):
-    """Получение истории транзакций"""
+    """Получение истории транзакций (только ручной ввод)"""
     repo = TransactionRepository(db)
-    transactions = repo.get_user_transactions(1, limit, offset)
+    # Фильтруем только ручные транзакции (is_auto=True)
+    transactions = repo.get_user_transactions_by_source(1, limit, offset, is_auto=True)
     return [t.to_dict() for t in transactions]
 
 
@@ -388,9 +392,9 @@ async def clear_all_transactions_get(db: Session = Depends(get_db)):
 
 @app.get("/api/stats")
 async def get_stats(db: Session = Depends(get_db)):
-    """Статистика пользователя"""
+    """Статистика только для ручного ввода (is_auto=True)"""
     repo = TransactionRepository(db)
-    return repo.get_statistics(1)
+    return repo.get_statistics_by_source(1, is_auto=True)
 
 
 @app.get("/api/analytics/categories")
@@ -439,6 +443,18 @@ async def get_daily_spending(
     """Ежедневные расходы"""
     analytics = AnalyticsService(db)
     return analytics.get_daily_spending(1, days)
+
+@app.get("/api/analytics/manual")
+async def get_manual_analytics(db: Session = Depends(get_db)):
+    """Аналитика только для ручного ввода (is_auto = True)"""
+    analytics = AnalyticsService(db)
+    return analytics.get_analytics_by_source(1, is_auto=True)
+
+@app.get("/api/analytics/bank")
+async def get_bank_analytics(db: Session = Depends(get_db)):
+    """Аналитика только для выписок (is_auto = False)"""
+    analytics = AnalyticsService(db)
+    return analytics.get_analytics_by_source(1, is_auto=False)
 
 
 @app.get("/api/export/csv")
@@ -494,7 +510,55 @@ async def retrain_model_manual(db: Session = Depends(get_db)):
             "message": f"Недостаточно исправлений. Нужно минимум 5, есть {pending}",
             "pending_count": pending
         }
+    
 
+@app.get("/api/statements")
+async def get_statements_list(db: Session = Depends(get_db)):
+    """Список загруженных выписок"""
+    # Получаем все транзакции из выписок (is_auto=False)
+    bank_transactions = db.query(Transaction).filter(
+        Transaction.user_id == 1,
+        Transaction.is_auto == False
+    ).order_by(Transaction.created_at.desc()).all()
+    
+    if not bank_transactions:
+        return {"statements": []}
+    
+    # Группируем по дате загрузки (приблизительно)
+    statements = []
+    current_date = None
+    current_batch = []
+    
+    for t in bank_transactions:
+        date_key = t.created_at.strftime('%Y-%m-%d')
+        if date_key != current_date:
+            if current_batch:
+                statements.append({
+                    'filename': f'Выписка от {current_date}',
+                    'upload_date': current_date,
+                    'transactions_count': len(current_batch),
+                    'total_amount': sum(abs(t.amount) for t in current_batch if t.amount and t.amount < 0)
+                })
+            current_date = date_key
+            current_batch = [t]
+        else:
+            current_batch.append(t)
+    
+    # Добавляем последнюю партию
+    if current_batch:
+        statements.append({
+            'filename': f'Выписка от {current_date}',
+            'upload_date': current_date,
+            'transactions_count': len(current_batch),
+            'total_amount': sum(abs(t.amount) for t in current_batch if t.amount and t.amount < 0)
+        })
+    
+    return {"statements": statements}
+
+@app.get("/statements", response_class=HTMLResponse)
+async def statements_page(request: Request):
+    """Страница управления выписками"""
+    return templates.TemplateResponse("statements.html", {"request": request})
 
 def auto_retrain_if_needed(db: Session):
     """Автоматическое дообучение после КАЖДОГО исправления"""

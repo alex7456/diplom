@@ -267,6 +267,10 @@
             color: #10b981;
             font-weight: 500;
         }
+        .nav-links a.active {
+    background: #eef2ff;
+    color: #2563eb;
+}
         
         @media (max-width: 768px) {
             .history-header {
@@ -292,6 +296,7 @@
             <a href="/app">Транзакции</a>
             <a href="/dashboard">Аналитика</a>
             <a href="/history">История</a>
+            <a href="/statements">Выписки</a>
         </div>
     </nav>
     
@@ -359,7 +364,19 @@
                 document.getElementById('transactionsTable').innerHTML = '<div class="loading">Ошибка загрузки</div>';
             }
         }
-        
+        // Подсветка активной вкладки
+function setActiveNav() {
+    const currentPath = window.location.pathname;
+    document.querySelectorAll('.nav-links a').forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === currentPath) {
+            link.classList.add('active');
+        }
+    });
+}
+
+// Вызовите после загрузки страницы
+setActiveNav();
         function displayTransactions(transactions) {
             if (!transactions.length) {
                 document.getElementById('transactionsTable').innerHTML = '<div style="text-align: center; padding: 50px; color: #64748b;">Нет транзакций</div>';

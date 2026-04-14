@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Categorizer - Выписки</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #eef2f7 100%);
+            color: #1e293b;
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 0 32px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.95);
+        }
+        
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .nav-links a {
+            color: #475569;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .nav-links a:hover {
+            background: #eef2ff;
+            color: #2563eb;
+        }
+        
+        .nav-links a.active {
+            background: #eef2ff;
+            color: #2563eb;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+        
+        .card {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 28px;
+            margin-bottom: 24px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #0f172a;
+            border-left: 3px solid #2563eb;
+            padding-left: 12px;
+        }
+        
+        .stat-item {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s;
+        }
+        
+        .stat-item:hover {
+            background: #f1f5f9;
+            transform: translateX(4px);
+        }
+        
+        .stat-name {
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        
+        .stat-detail {
+            font-size: 14px;
+            color: #64748b;
+        }
+        
+        .stat-detail span {
+            display: inline-block;
+            margin-right: 16px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: #64748b;
+        }
+        
+        .error {
+            color: #dc2626;
+            padding: 12px;
+            background: #fef2f2;
+            border-radius: 12px;
+            margin-top: 12px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #64748b;
+        }
+        
+        .info-note {
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+            color: #64748b;
+            font-size: 13px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 16px;
+            }
+            .stat-detail span {
+                display: block;
+                margin-bottom: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">Expense Categorizer</div>
+        <div class="nav-links">
+            <a href="/app" id="navApp">Транзакции</a>
+            <a href="/dashboard" id="navDashboard">Аналитика</a>
+            <a href="/history" id="navHistory">История</a>
+            <a href="/statements" id="navStatements">Выписки</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="card">
+            <div class="card-title">История выписок</div>
+            <div id="statementsList">
+                <div class="loading">Загрузка...</div>
+            </div>
+            <div class="info-note">
+                <strong>Информация:</strong> Выписки загружаются на странице аналитики. Здесь отображается история всех загруженных выписок.
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Подсветка активной вкладки
+        function setActiveNav() {
+            const currentPath = window.location.pathname;
+            document.querySelectorAll('.nav-links a').forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                }
+            });
+        }
+        
+        async function loadStatements() {
+            const container = document.getElementById('statementsList');
+            try {
+                const response = await fetch('/api/statements');
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.statements && data.statements.length > 0) {
+                        let html = '';
+                        let totalTransactions = 0;
+                        let totalAmount = 0;
+                        
+                        for (const s of data.statements) {
+                            totalTransactions += s.transactions_count;
+                            totalAmount += s.total_amount;
+                            html += `
+                                <div class="stat-item">
+                                    <div class="stat-name">📄 ${escapeHtml(s.filename)}</div>
+                                    <div class="stat-detail">
+                                        <span>📅 ${s.upload_date}</span>
+                                        <span>📊 ${s.transactions_count} транзакций</span>
+                                        <span>💰 ${s.total_amount.toLocaleString()} ₽</span>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                        
+                        // Добавляем итоговую карточку
+                        html += `
+                            <div class="stat-item" style="background: #eef2ff;">
+                                <div class="stat-name">📊 Итого по всем выпискам</div>
+                                <div class="stat-detail">
+                                    <span>📊 Всего транзакций: ${totalTransactions}</span>
+                                    <span>💰 Общая сумма: ${totalAmount.toLocaleString()} ₽</span>
+                                </div>
+                            </div>
+                        `;
+                        
+                        container.innerHTML = html;
+                    } else {
+                        container.innerHTML = '<div class="empty-state">Нет загруженных выписок.<br>Перейдите в раздел "Аналитика" → "Выписки из банка", чтобы загрузить первую выписку.</div>';
+                    }
+                } else {
+                    container.innerHTML = '<div class="empty-state">Ошибка загрузки данных</div>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                container.innerHTML = '<div class="empty-state">Ошибка загрузки данных</div>';
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Инициализация
+        setActiveNav();
+        loadStatements();
+    </script>
+</body>
+</html>
