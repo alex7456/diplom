@@ -26,6 +26,21 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
+    uploaded_files = relationship("UploadedFile", back_populates="user", cascade="all, delete-orphan")
+
+class UploadedFile(Base):
+    """Модель для хранения информации о загруженных файлах"""
+    __tablename__ = "uploaded_files"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    filename = Column(String, nullable=False)
+    upload_date = Column(DateTime, default=datetime.utcnow)
+    transactions_count = Column(Integer, default=0)
+    total_amount = Column(Float, default=0)
+    
+    # Связь с пользователем
+    user = relationship("User", back_populates="uploaded_files")
 
 
 class Transaction(Base):

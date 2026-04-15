@@ -177,40 +177,48 @@ class AnalyticsService:
                 category_stats[category]['count'] += 1
                 category_stats[category]['total'] += amount
         
-        # Динамика по месяцам
-        monthly = {}
+        # Топ магазинов
+        merchant_stats = {}
         for t in transactions:
             if t.amount and t.amount < 0:
-                month_key = t.created_at.strftime('%Y-%m')
-                category = t.get_final_category()
-                if month_key not in monthly:
-                    monthly[month_key] = {}
-                monthly[month_key][category] = monthly[month_key].get(category, 0) + abs(t.amount)
+                merchant = t.description.split()[0] if t.description else "unknown"
+                merchant_stats[merchant] = merchant_stats.get(merchant, 0) + abs(t.amount)
+        top_merchants = [{"name": k, "total": v} for k, v in sorted(merchant_stats.items(), key=lambda x: x[1], reverse=True)[:8]]
         
-        # Топ магазинов (для выписок)
-        top_merchants = []
-        if not is_auto:
-            merchant_stats = {}
-            for t in transactions:
-                if t.amount and t.amount < 0:
-                    merchant = t.description.split()[0] if t.description else "unknown"
-                    merchant_stats[merchant] = merchant_stats.get(merchant, 0) + abs(t.amount)
-            top_merchants = [{"name": k, "total": v} for k, v in sorted(merchant_stats.items(), key=lambda x: x[1], reverse=True)[:8]]
-        
-        # Ежедневные расходы (для выписок)
+        # Ежедневные расходы
         daily = {}
-        if not is_auto:
-            for t in transactions:
-                if t.amount and t.amount < 0:
-                    day_key = t.created_at.strftime('%Y-%m-%d')
-                    daily[day_key] = daily.get(day_key, 0) + abs(t.amount)
+        for t in transactions:
+            if t.amount and t.amount < 0:
+                day_key = t.created_at.strftime('%Y-%m-%d')
+                daily[day_key] = daily.get(day_key, 0) + abs(t.amount)
         
         return {
             'total_expenses': total_expenses,
             'total_income': total_income,
             'total_transactions': len(transactions),
             'categories': category_stats,
-            'monthly': monthly,
             'top_merchants': top_merchants,
             'daily': daily
         }
+    
+    def get_weekly_spending(self, user_id: int, is_auto: bool = None) -> Dict[str, float]:
+        """Расходы по дням недели"""
+        query = self.db.query(Transaction).filter(
+            Transaction.user_id == user_id,
+            Transaction.amount < 0
+        )
+        
+        if is_auto is not None:
+            query = query.filter(Transaction.is_auto == is_auto)
+        
+        transactions = query.all()
+        
+        weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+        weekly = defaultdict(float)
+        
+        for t in transactions:
+            if t.amount and t.amount < 0:
+                weekday_num = t.created_at.weekday()
+                weekly[weekdays[weekday_num]] += abs(t.amount)
+        
+        return dict(weekly)

@@ -108,25 +108,36 @@ async def history(request: Request):
 async def predict_transaction(
     description: str = Form(...),
     amount: Optional[float] = Form(None),
+    date: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
-    """Предсказание и сохранение транзакции"""
+    """Предсказание и сохранение транзакции (ручной ввод)"""
     start_time = time.time()
     
     category, confidence = ml_service.predict(description, amount)
     processing_time = (time.time() - start_time) * 1000
     
-    # Сохраняем в БД (user_id = 1 для всех, упрощённо)
-    repo = TransactionRepository(db)
-    transaction = repo.create(
+    # Обработка даты
+    transaction_date = datetime.now()
+    if date:
+        try:
+            transaction_date = datetime.strptime(date, '%Y-%m-%d')
+        except:
+            pass
+    
+    transaction = Transaction(
         user_id=1,
         description=description,
         amount=amount,
         predicted_category=category,
         confidence=confidence,
         processing_time_ms=processing_time,
-        is_auto=True
+        is_auto=True,
+        created_at=transaction_date
     )
+    db.add(transaction)
+    db.commit()
+    db.refresh(transaction)
     
     return {
         "id": transaction.id,
@@ -134,7 +145,8 @@ async def predict_transaction(
         "amount": amount,
         "predicted_category": category,
         "confidence": confidence,
-        "processing_time_ms": processing_time
+        "processing_time_ms": processing_time,
+        "date": transaction_date.strftime('%Y-%m-%d')
     }
 
 @app.post("/api/upload-bank-statement")
@@ -148,6 +160,7 @@ async def upload_bank_statement(
     """
     import chardet
     import csv
+    from database import UploadedFile
     
     contents = await file.read()
     
@@ -164,7 +177,6 @@ async def upload_bank_statement(
         # Сначала пробуем прочитать как обычный CSV с автоопределением
         for sep in separators:
             try:
-                # Пробуем прочитать с определённым разделителем
                 text = contents.decode(encoding, errors='ignore')
                 from io import StringIO
                 df = pd.read_csv(StringIO(text), sep=sep, encoding=encoding, 
@@ -195,7 +207,6 @@ async def upload_bank_statement(
                     from io import StringIO
                     df = pd.read_csv(StringIO(text), sep=sep, header=None, on_bad_lines='skip')
                     if len(df.columns) > 1:
-                        # Используем первую строку как заголовок
                         df.columns = df.iloc[0]
                         df = df[1:]
                         break
@@ -219,6 +230,7 @@ async def upload_bank_statement(
     # Автоопределение колонок
     description_col = None
     amount_col = None
+    date_col = None
     
     # Ищем колонку с описанием
     description_keywords = ['описание', 'назначение', 'description', 'наименование', 'comment', 'название', 'detail']
@@ -235,7 +247,7 @@ async def upload_bank_statement(
                 break
     
     # Ищем колонку с суммой
-    amount_keywords = ['сумма', 'amount', 'списано', 'зачислено', 'payment', 'total', 'сумма операции']
+    amount_keywords = ['сумма операции', 'сумма', 'amount', 'списано', 'зачислено']
     for col in df.columns:
         if any(keyword in col for keyword in amount_keywords):
             amount_col = col
@@ -248,10 +260,17 @@ async def upload_bank_statement(
                 amount_col = col
                 break
     
+    # Ищем колонку с датой
+    date_keywords = ['дата операции', 'дата', 'date', 'datetime']
+    for col in df.columns:
+        if any(keyword in col for keyword in date_keywords):
+            date_col = col
+            break
+    
     # Обработка транзакций
     processed = 0
     total_expenses = 0
-    total_income = 0  # <--- ДОБАВЬТЕ ЭТУ СТРОКУ
+    total_income = 0
     category_stats = defaultdict(int)
     errors = []
     
@@ -271,14 +290,21 @@ async def upload_bank_statement(
             if any(word in description.lower() for word in skip_words):
                 continue
             
-            # Получаем сумму (НЕ МЕНЯЕМ ЗНАК!)
+            # Получаем сумму (НЕ МЕНЯЕМ ЗНАК)
             amount = None
             if amount_col and pd.notna(row[amount_col]):
                 try:
                     amount = float(row[amount_col])
-                    # НЕ МЕНЯЕМ ЗНАК! Если в файле -500 → расход, если 39927 → доход
                 except:
                     amount = None
+            
+            # Получаем дату из выписки
+            transaction_date = datetime.now()
+            if date_col and pd.notna(row[date_col]):
+                try:
+                    transaction_date = pd.to_datetime(row[date_col])
+                except:
+                    pass
             
             # Предсказываем категорию
             category, confidence = ml_service.predict(description, amount)
@@ -287,12 +313,12 @@ async def upload_bank_statement(
             transaction = Transaction(
                 user_id=1,
                 description=description[:500],
-                amount=amount if amount else None,
+                amount=amount,
                 predicted_category=category,
                 confidence=confidence,
                 processing_time_ms=0,
                 is_auto=False,
-                created_at=datetime.now()
+                created_at=transaction_date
             )
             db.add(transaction)
             processed += 1
@@ -301,7 +327,7 @@ async def upload_bank_statement(
                 if amount < 0:
                     total_expenses += abs(amount)
                 elif amount > 0:
-                    total_income += amount  # <--- ДОБАВЬТЕ ЭТУ СТРОКУ
+                    total_income += amount
             
             category_stats[category] += 1
             
@@ -317,11 +343,22 @@ async def upload_bank_statement(
             content={"detail": f"Не удалось обработать ни одной транзакции. Ошибки: {errors[:3]}"}
         )
     
+    # Сохраняем информацию о загруженном файле
+    uploaded_file = UploadedFile(
+        user_id=1,
+        filename=file.filename,
+        upload_date=datetime.now(),  # Текущая дата и время загрузки
+        transactions_count=processed,
+        total_amount=total_expenses
+    )
+    db.add(uploaded_file)
+    db.commit()
+    
     return {
         "success": True,
         "total": processed,
         "total_expenses": total_expenses,
-        "total_income": total_income,  # <--- ДОБАВЬТЕ ЭТУ СТРОКУ
+        "total_income": total_income,
         "category_stats": dict(category_stats),
         "filename": file.filename,
         "errors": errors[:5] if errors else []
@@ -515,50 +552,35 @@ async def retrain_model_manual(db: Session = Depends(get_db)):
 @app.get("/api/statements")
 async def get_statements_list(db: Session = Depends(get_db)):
     """Список загруженных выписок"""
-    # Получаем все транзакции из выписок (is_auto=False)
-    bank_transactions = db.query(Transaction).filter(
-        Transaction.user_id == 1,
-        Transaction.is_auto == False
-    ).order_by(Transaction.created_at.desc()).all()
+    from database import UploadedFile
     
-    if not bank_transactions:
-        return {"statements": []}
+    files = db.query(UploadedFile).filter(
+        UploadedFile.user_id == 1
+    ).order_by(UploadedFile.upload_date.desc()).all()
     
-    # Группируем по дате загрузки (приблизительно)
     statements = []
-    current_date = None
-    current_batch = []
-    
-    for t in bank_transactions:
-        date_key = t.created_at.strftime('%Y-%m-%d')
-        if date_key != current_date:
-            if current_batch:
-                statements.append({
-                    'filename': f'Выписка от {current_date}',
-                    'upload_date': current_date,
-                    'transactions_count': len(current_batch),
-                    'total_amount': sum(abs(t.amount) for t in current_batch if t.amount and t.amount < 0)
-                })
-            current_date = date_key
-            current_batch = [t]
-        else:
-            current_batch.append(t)
-    
-    # Добавляем последнюю партию
-    if current_batch:
+    for f in files:
         statements.append({
-            'filename': f'Выписка от {current_date}',
-            'upload_date': current_date,
-            'transactions_count': len(current_batch),
-            'total_amount': sum(abs(t.amount) for t in current_batch if t.amount and t.amount < 0)
+            'filename': f.filename,
+            'upload_date': f.upload_date.strftime('%Y-%m-%d %H:%M:%S'),
+            'transactions_count': f.transactions_count,
+            'total_amount': f.total_amount
         })
     
     return {"statements": statements}
+
 
 @app.get("/statements", response_class=HTMLResponse)
 async def statements_page(request: Request):
     """Страница управления выписками"""
     return templates.TemplateResponse("statements.html", {"request": request})
+
+@app.get("/api/analytics/manual/weekly")
+async def get_manual_weekly_spending(db: Session = Depends(get_db)):
+    """Расходы по дням недели (ручной ввод)"""
+    analytics = AnalyticsService(db)
+    return analytics.get_weekly_spending(1, is_auto=True)
+
 
 def auto_retrain_if_needed(db: Session):
     """Автоматическое дообучение после КАЖДОГО исправления"""

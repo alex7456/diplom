@@ -120,28 +120,12 @@
         
         .stat-detail span {
             display: inline-block;
-            margin-right: 16px;
+            margin-right: 20px;
         }
         
         .empty-state {
             text-align: center;
             padding: 60px;
-            color: #64748b;
-        }
-        
-        .error {
-            color: #dc2626;
-            padding: 12px;
-            background: #fef2f2;
-            border-radius: 12px;
-            margin-top: 12px;
-            font-size: 14px;
-            font-weight: 500;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 50px;
             color: #64748b;
         }
         
@@ -161,7 +145,7 @@
             }
             .stat-detail span {
                 display: block;
-                margin-bottom: 4px;
+                margin-bottom: 6px;
             }
         }
     </style>
@@ -170,10 +154,10 @@
     <nav class="navbar">
         <div class="logo">Expense Categorizer</div>
         <div class="nav-links">
-            <a href="/app" id="navApp">Транзакции</a>
-            <a href="/dashboard" id="navDashboard">Аналитика</a>
-            <a href="/history" id="navHistory">История</a>
-            <a href="/statements" id="navStatements">Выписки</a>
+            <a href="/app">Транзакции</a>
+            <a href="/dashboard">Аналитика</a>
+            <a href="/history">История</a>
+            <a href="/statements">Выписки</a>
         </div>
     </nav>
     
@@ -184,13 +168,12 @@
                 <div class="loading">Загрузка...</div>
             </div>
             <div class="info-note">
-                <strong>Информация:</strong> Выписки загружаются на странице аналитики. Здесь отображается история всех загруженных выписок.
+                Здесь отображаются все загруженные выписки с датой и временем загрузки.
             </div>
         </div>
     </div>
     
     <script>
-        // Подсветка активной вкладки
         function setActiveNav() {
             const currentPath = window.location.pathname;
             document.querySelectorAll('.nav-links a').forEach(link => {
@@ -218,30 +201,30 @@
                             totalAmount += s.total_amount;
                             html += `
                                 <div class="stat-item">
-                                    <div class="stat-name">📄 ${escapeHtml(s.filename)}</div>
+                                    <div class="stat-name">${escapeHtml(s.filename)}</div>
                                     <div class="stat-detail">
-                                        <span>📅 ${s.upload_date}</span>
-                                        <span>📊 ${s.transactions_count} транзакций</span>
-                                        <span>💰 ${s.total_amount.toLocaleString()} ₽</span>
+                                        <span>Загружено: ${s.upload_date}</span>
+                                        <span>Транзакций: ${s.transactions_count}</span>
+                                        <span>Сумма: ${s.total_amount.toLocaleString()} ₽</span>
                                     </div>
                                 </div>
                             `;
                         }
                         
-                        // Добавляем итоговую карточку
                         html += `
                             <div class="stat-item" style="background: #eef2ff;">
-                                <div class="stat-name">📊 Итого по всем выпискам</div>
+                                <div class="stat-name">Итого</div>
                                 <div class="stat-detail">
-                                    <span>📊 Всего транзакций: ${totalTransactions}</span>
-                                    <span>💰 Общая сумма: ${totalAmount.toLocaleString()} ₽</span>
+                                    <span>Всего выписок: ${data.statements.length}</span>
+                                    <span>Всего транзакций: ${totalTransactions}</span>
+                                    <span>Общая сумма: ${totalAmount.toLocaleString()} ₽</span>
                                 </div>
                             </div>
                         `;
                         
                         container.innerHTML = html;
                     } else {
-                        container.innerHTML = '<div class="empty-state">Нет загруженных выписок.<br>Перейдите в раздел "Аналитика" → "Выписки из банка", чтобы загрузить первую выписку.</div>';
+                        container.innerHTML = '<div class="empty-state">Нет загруженных выписок</div>';
                     }
                 } else {
                     container.innerHTML = '<div class="empty-state">Ошибка загрузки данных</div>';
@@ -258,7 +241,6 @@
             return div.innerHTML;
         }
         
-        // Инициализация
         setActiveNav();
         loadStatements();
     </script>
