@@ -97,6 +97,15 @@
             letter-spacing: -0.2px;
             border-left: 3px solid #2563eb;
             padding-left: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .add-transaction-btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            padding: 6px 16px;
+            font-size: 13px;
         }
         
         .form-group {
@@ -129,11 +138,6 @@
             border-color: #2563eb;
             background: #ffffff;
             box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
-        }
-        
-        textarea {
-            resize: vertical;
-            min-height: 100px;
         }
         
         button {
@@ -175,6 +179,75 @@
         
         .btn-secondary:hover {
             background: linear-gradient(135deg, #475569, #334155);
+        }
+        
+        .transactions-list {
+            margin-top: 20px;
+        }
+        
+        .transaction-item {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid #e2e8f0;
+            position: relative;
+        }
+        
+        .transaction-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .transaction-number {
+            font-weight: 600;
+            color: #2563eb;
+            font-size: 14px;
+        }
+        
+        .remove-transaction {
+            background: #ef4444;
+            padding: 4px 12px;
+            font-size: 12px;
+        }
+        
+        .transaction-fields {
+            display: grid;
+            grid-template-columns: 1fr 180px 160px;
+            gap: 12px;
+            align-items: end;
+        }
+        
+        .transaction-fields .form-group {
+            margin-bottom: 0;
+        }
+        
+        .transaction-fields label {
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+        
+        .transaction-fields input, 
+        .transaction-fields textarea {
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+        
+        .transaction-fields textarea {
+            min-height: 38px;
+            resize: vertical;
+        }
+        
+        .batch-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
         }
         
         .result-card {
@@ -302,24 +375,17 @@
             100% { transform: rotate(360deg); }
         }
         
-        .batch-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 16px;
-            font-size: 14px;
+        .results-list {
+            max-height: 400px;
+            overflow-y: auto;
         }
         
-        .batch-table th,
-        .batch-table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        
-        .batch-table th {
+        .result-item {
             background: #f8fafc;
-            font-weight: 600;
-            color: #475569;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 8px;
+            border: 1px solid #e2e8f0;
         }
         
         @media (max-width: 768px) {
@@ -331,6 +397,10 @@
             }
             .card {
                 padding: 20px;
+            }
+            .transaction-fields {
+                grid-template-columns: 1fr;
+                gap: 12px;
             }
         }
     </style>
@@ -347,23 +417,42 @@
     </nav>
     
     <div class="container">
-        <!-- Новая транзакция -->
+        <!-- Множественный ввод транзакций -->
         <div class="card">
-            <div class="card-title">Новая транзакция</div>
-            <div class="form-group">
-                <label>Описание</label>
-                <textarea id="description" placeholder="Например: Пятерочка 1234"></textarea>
+            <div class="card-title">
+                Новые транзакции
+                <button onclick="addTransactionForm()" class="add-transaction-btn">+ Добавить транзакцию</button>
             </div>
-            <div class="form-group">
-                <label>Сумма (опционально)</label>
-                <input type="number" id="amount" step="0.01" placeholder="Отрицательная для расходов">
+            
+            <div id="transactionsContainer" class="transactions-list">
+                <div class="transaction-item" data-id="0">
+                    <div class="transaction-header">
+                        <span class="transaction-number">Транзакция #1</span>
+                        <button onclick="removeTransaction(0)" class="remove-transaction" style="display: none;">Удалить</button>
+                    </div>
+                    <div class="transaction-fields">
+                        <div class="form-group">
+                            <label>Описание</label>
+                            <textarea class="trans-desc" placeholder="Например: Пятерочка 1234"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Сумма (₽)</label>
+                            <input type="number" class="trans-amount" step="0.01" placeholder="Отрицательная для расходов">
+                        </div>
+                        <div class="form-group">
+                            <label>Дата</label>
+                            <input type="date" class="trans-date" value="">
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label>Дата</label>
-                <input type="date" id="transactionDate" value="">
+            
+            <div class="batch-actions">
+                <button onclick="saveAllTransactions()" class="btn-success">Сохранить все транзакции</button>
+                <button onclick="clearAllTransactions()" class="btn-secondary">Очистить все</button>
             </div>
-            <button onclick="predict()">Определить категорию</button>
-            <div id="result" class="result-card"></div>
+            
+            <div id="batchResult" class="result-card"></div>
         </div>
         
         <!-- Статистика -->
@@ -394,50 +483,10 @@
             </div>
             <div id="clearResult"></div>
         </div>
-        
-        <!-- Пакетная обработка -->
-        <div class="card">
-            <div class="card-title">Пакетная обработка</div>
-            <div class="form-group">
-                <label>Формат ввода</label>
-                <div style="font-size: 13px; color: #64748b; margin-bottom: 12px;">
-                    Расширенный режим: <strong>Описание: сумма: дата</strong> (дата в формате ГГГГ-ММ-ДД)
-                </div>
-                <textarea id="batchText" rows="4" placeholder="Пятерочка: -450: 2026-04-10&#10;Яндекс Такси: -300: 2026-04-11&#10;Макдоналдс: -550: 2026-04-12"></textarea>
-            </div>
-            <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
-                <button onclick="parseAndPreview()">Предпросмотр</button>
-                <button onclick="loadFromClipboard()" class="btn-secondary">Вставить из буфера</button>
-            </div>
-            <div id="previewContainer" style="display: none;">
-                <div style="margin: 16px 0 12px 0; font-weight: 600;">Предпросмотр</div>
-                <div style="overflow-x: auto;">
-                    <table class="batch-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 40px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
-                                <th>Описание</th>
-                                <th style="width: 120px;">Сумма</th>
-                                <th style="width: 120px;">Дата</th>
-                                <th style="width: 140px;">Категория</th>
-                                <th style="width: 80px;">Действия</th>
-                            </tr>
-                        </thead>
-                        <tbody id="previewBody"></tbody>
-                    </table>
-                </div>
-                <div style="display: flex; gap: 12px; margin-top: 16px;">
-                    <button onclick="saveSelected()">Сохранить выбранные</button>
-                    <button onclick="saveAll()" class="btn-success">Сохранить все</button>
-                    <button onclick="clearPreview()" class="btn-secondary">Очистить</button>
-                </div>
-            </div>
-            <div id="batchResult"></div>
-        </div>
     </div>
     
     <script>
-        let previewData = [];
+        let nextId = 1;
         
         async function loadStats() {
             try {
@@ -464,240 +513,206 @@
         
         setActiveNav();
         
-        async function predict() {
-            const description = document.getElementById('description').value;
-            const amount = document.getElementById('amount').value;
-            const transactionDate = document.getElementById('transactionDate').value;
-            
-            if (!description.trim()) {
-                alert('Введите описание транзакции');
-                return;
-            }
-            
-            const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = '<div class="loading"></div> Анализ...';
-            resultDiv.classList.add('show');
-            
-            try {
-                const formData = new URLSearchParams();
-                formData.append('description', description);
-                if (amount) formData.append('amount', amount);
-                if (transactionDate) formData.append('date', transactionDate);
-                
-                const response = await fetch('/api/predict', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    resultDiv.innerHTML = `
-                        <div style="font-weight: 600; margin-bottom: 12px;">Транзакция сохранена</div>
-                        <div class="category-badge category-${data.predicted_category}">${data.predicted_category}</div>
-                        <div style="margin-top: 12px; font-size: 14px; color: #334155;">
-                            <div>Описание: ${escapeHtml(data.description)}</div>
-                            ${data.amount ? `<div>Сумма: ${data.amount} ₽</div>` : ''}
-                            ${data.date ? `<div>Дата: ${data.date}</div>` : ''}
-                        </div>
-                    `;
-                    
-                    document.getElementById('description').value = '';
-                    document.getElementById('amount').value = '';
-                    document.getElementById('transactionDate').value = '';
-                    loadStats();
-                } else {
-                    resultDiv.innerHTML = `<div class="error">Ошибка: ${data.detail}</div>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
+        function addTransactionForm() {
+            const container = document.getElementById('transactionsContainer');
+            const id = nextId++;
+            const newTransaction = document.createElement('div');
+            newTransaction.className = 'transaction-item';
+            newTransaction.setAttribute('data-id', id);
+            newTransaction.innerHTML = `
+                <div class="transaction-header">
+                    <span class="transaction-number">Транзакция #${id + 1}</span>
+                    <button onclick="removeTransaction(${id})" class="remove-transaction">Удалить</button>
+                </div>
+                <div class="transaction-fields">
+                    <div class="form-group">
+                        <label>Описание</label>
+                        <textarea class="trans-desc" placeholder="Например: Пятерочка 1234"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Сумма (₽)</label>
+                        <input type="number" class="trans-amount" step="0.01" placeholder="Отрицательная для расходов">
+                    </div>
+                    <div class="form-group">
+                        <label>Дата</label>
+                        <input type="date" class="trans-date" value="">
+                    </div>
+                </div>
+            `;
+            container.appendChild(newTransaction);
+            updateTransactionNumbers();
+        }
+        
+        function removeTransaction(id) {
+            const element = document.querySelector(`.transaction-item[data-id='${id}']`);
+            if (element) {
+                element.remove();
+                updateTransactionNumbers();
             }
         }
+        
+        function updateTransactionNumbers() {
+            const transactions = document.querySelectorAll('.transaction-item');
+            transactions.forEach((item, index) => {
+                const numberSpan = item.querySelector('.transaction-number');
+                if (numberSpan) {
+                    numberSpan.textContent = `Транзакция #${index + 1}`;
+                }
+                const removeBtn = item.querySelector('.remove-transaction');
+                if (removeBtn) {
+                    removeBtn.style.display = transactions.length === 1 ? 'none' : 'inline-block';
+                }
+            });
+        }
+        
+        function getAllTransactions() {
+            const transactions = [];
+            const items = document.querySelectorAll('.transaction-item');
+            
+            for (const item of items) {
+                const description = item.querySelector('.trans-desc')?.value.trim();
+                if (!description) continue;
+                
+                const amount = item.querySelector('.trans-amount')?.value;
+                const date = item.querySelector('.trans-date')?.value;
+                
+                transactions.push({
+                    description: description,
+                    amount: amount ? parseFloat(amount) : null,
+                    date: date || null
+                });
+            }
+            
+            return transactions;
+        }
+        
+        function clearAllTransactions() {
+            const container = document.getElementById('transactionsContainer');
+            container.innerHTML = '';
+            
+            // Добавляем одну пустую форму
+            nextId = 1;
+            const newTransaction = document.createElement('div');
+            newTransaction.className = 'transaction-item';
+            newTransaction.setAttribute('data-id', 0);
+            newTransaction.innerHTML = `
+                <div class="transaction-header">
+                    <span class="transaction-number">Транзакция #1</span>
+                    <button onclick="removeTransaction(0)" class="remove-transaction" style="display: none;">Удалить</button>
+                </div>
+                <div class="transaction-fields">
+                    <div class="form-group">
+                        <label>Описание</label>
+                        <textarea class="trans-desc" placeholder="Например: Пятерочка 1234"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Сумма (₽)</label>
+                        <input type="number" class="trans-amount" step="0.01" placeholder="Отрицательная для расходов">
+                    </div>
+                    <div class="form-group">
+                        <label>Дата</label>
+                        <input type="date" class="trans-date" value="">
+                    </div>
+                </div>
+            `;
+            container.appendChild(newTransaction);
+            
+            const resultDiv = document.getElementById('batchResult');
+            resultDiv.classList.remove('show');
+            resultDiv.innerHTML = '';
+        }
+        
+        async function saveAllTransactions() {
+    const transactions = getAllTransactions();
+    
+    if (transactions.length === 0) {
+        alert('Нет транзакций для сохранения');
+        return;
+    }
+    
+    const resultDiv = document.getElementById('batchResult');
+    resultDiv.innerHTML = '<div class="loading"></div> Сохранение...';
+    resultDiv.classList.add('show');
+    
+    let saved = 0;
+    let errors = 0;
+    const results = [];
+    
+    for (let i = 0; i < transactions.length; i++) {
+        const trans = transactions[i];
+        
+        try {
+            const formData = new URLSearchParams();
+            formData.append('description', trans.description);
+            if (trans.amount) formData.append('amount', trans.amount);
+            if (trans.date) formData.append('date', trans.date);
+            
+            const response = await fetch('/api/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                saved++;
+                results.push({
+                    description: trans.description,
+                    category: data.predicted_category,
+                    status: 'success'
+                });
+            } else {
+                errors++;
+                results.push({
+                    description: trans.description,
+                    category: 'Ошибка',
+                    status: 'error'
+                });
+            }
+        } catch (error) {
+            errors++;
+            results.push({
+                description: trans.description,
+                category: 'Ошибка',
+                status: 'error'
+            });
+        }
+    }
+    
+    // Показать результаты (без автоматического исчезновения)
+    let html = `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div class="success">✅ Сохранено: ${saved}, ❌ ошибок: ${errors}</div>
+                    <button onclick="closeBatchResult()" style="background: #64748b; padding: 6px 16px;">Закрыть</button>
+                </div>`;
+    html += '<div class="results-list" style="max-height: 300px; overflow-y: auto;"><strong>Результаты:</strong>';
+    for (const r of results) {
+        const icon = r.status === 'success' ? '✅' : '❌';
+        html += `<div class="result-item" style="padding: 8px; margin-bottom: 6px;">${icon} ${escapeHtml(r.description)} → <span class="category-badge category-${r.category}" style="font-size: 11px; padding: 2px 10px;">${r.category}</span></div>`;
+    }
+    html += '</div>';
+    
+    resultDiv.innerHTML = html;
+    loadStats();
+    
+    // НЕ очищаем формы автоматически, пусть пользователь решит
+    if (errors === 0 && saved > 0) {
+        // Показываем кнопку очистки форм
+        const clearBtn = document.createElement('button');
+        resultDiv.innerHTML += `<div style="margin-top: 16px;"><button onclick="clearAllTransactions()" class="btn-secondary" style="width: 100%;">🗑️ Очистить формы</button></div>`;
+    }
+}
+
+function closeBatchResult() {
+    const resultDiv = document.getElementById('batchResult');
+    resultDiv.classList.remove('show');
+    resultDiv.innerHTML = '';
+}
         
         function escapeHtml(text) { 
             const div = document.createElement('div'); 
             div.textContent = text; 
             return div.innerHTML; 
-        }
-        
-        function parseAndPreview() {
-            const text = document.getElementById('batchText').value;
-            const lines = text.split('\n').filter(line => line.trim());
-            previewData = [];
-            
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed) continue;
-                
-                let description = trimmed;
-                let amount = null;
-                let date = null;
-                
-                if (trimmed.includes(':')) {
-                    const parts = trimmed.split(':');
-                    description = parts[0].trim();
-                    
-                    if (parts.length >= 2) {
-                        amount = parseFloat(parts[1].trim());
-                        if (isNaN(amount)) amount = null;
-                    }
-                    
-                    if (parts.length >= 3) {
-                        date = parts[2].trim();
-                    }
-                }
-                
-                previewData.push({
-                    id: Date.now() + Math.random(),
-                    description: description,
-                    amount: amount,
-                    date: date,
-                    category: null,
-                    confidence: null,
-                    selected: true
-                });
-            }
-            
-            if (previewData.length === 0) {
-                alert('Нет данных для обработки');
-                return;
-            }
-            
-            awaitPredictions();
-        }
-        
-        async function awaitPredictions() {
-            const container = document.getElementById('previewContainer');
-            const body = document.getElementById('previewBody');
-            container.style.display = 'block';
-            body.innerHTML = '<tr><td colspan="6" style="text-align: center;"><div class="loading"></div> Анализ...</td></tr>';
-            for (let i = 0; i < previewData.length; i++) {
-                const item = previewData[i];
-                try {
-                    const formData = new URLSearchParams();
-                    formData.append('description', item.description);
-                    if (item.amount) formData.append('amount', item.amount);
-                    const response = await fetch('/api/predict', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formData });
-                    const data = await response.json();
-                    if (response.ok) {
-                        item.category = data.predicted_category;
-                        item.confidence = (data.confidence * 100).toFixed(1);
-                    } else { item.category = 'Ошибка'; item.confidence = '0'; }
-                } catch (error) { item.category = 'Ошибка'; item.confidence = '0'; }
-            }
-            renderPreviewTable();
-        }
-        
-        function renderPreviewTable() {
-            const body = document.getElementById('previewBody');
-            body.innerHTML = '';
-            
-            for (let i = 0; i < previewData.length; i++) {
-                const item = previewData[i];
-                const row = body.insertRow();
-                row.innerHTML = `
-                    <td><input type="checkbox" class="row-select" data-index="${i}" ${item.selected ? 'checked' : ''} onchange="toggleSelectRow(${i})"><\/td>
-                    <td><input type="text" value="${escapeHtml(item.description)}" style="width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 8px;" onchange="updateDescription(${i}, this.value)"><\/td>
-                    <td><input type="number" value="${item.amount !== null ? item.amount : ''}" step="0.01" style="width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 8px;" onchange="updateAmount(${i}, this.value)"><\/td>
-                    <td><input type="date" value="${item.date || ''}" style="width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 8px;" onchange="updateDate(${i}, this.value)"><\/td>
-                    <td><select onchange="updateCategory(${i}, this.value)" style="width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 8px;">${generateCategoryOptions(item.category)}<\/select><\/td>
-                    <td><button onclick="removeRow(${i})" style="background: #ef4444; padding: 4px 12px;">Удалить<\/button><\/td>
-                `;
-            }
-        }
-        
-        function generateCategoryOptions(selected) {
-            const categories = ['Продукты', 'Транспорт', 'Кафе', 'Такси', 'Аптеки', 'Связь', 'Коммунальные', 'Развлечения', 'Одежда', 'Переводs'];
-            let html = '';
-            for (const cat of categories) html += `<option value="${cat}" ${selected === cat ? 'selected' : ''}>${cat}</option>`;
-            return html;
-        }
-        
-        function updateDescription(index, value) { previewData[index].description = value; }
-        function updateAmount(index, value) { previewData[index].amount = value ? parseFloat(value) : null; }
-        function updateCategory(index, value) { previewData[index].category = value; }
-        function updateDate(index, value) { previewData[index].date = value; }
-        
-        function toggleSelectRow(index) {
-            previewData[index].selected = !previewData[index].selected;
-            const selectAll = document.getElementById('selectAll');
-            if (selectAll) selectAll.checked = previewData.every(item => item.selected);
-        }
-        
-        function toggleSelectAll() {
-            const selectAll = document.getElementById('selectAll');
-            for (let i = 0; i < previewData.length; i++) previewData[i].selected = selectAll.checked;
-            renderPreviewTable();
-        }
-        
-        function removeRow(index) {
-            previewData.splice(index, 1);
-            if (previewData.length === 0) document.getElementById('previewContainer').style.display = 'none';
-            else renderPreviewTable();
-        }
-        
-        async function saveSelected() { await saveTransactions(previewData.filter(item => item.selected)); }
-        async function saveAll() { await saveTransactions(previewData); }
-        
-        async function saveTransactions(transactions) {
-            if (transactions.length === 0) {
-                alert('Нет транзакций для сохранения');
-                return;
-            }
-            
-            const resultDiv = document.getElementById('batchResult');
-            resultDiv.innerHTML = '<div class="loading"></div> Сохранение...';
-            
-            let saved = 0;
-            let errors = 0;
-            
-            for (const trans of transactions) {
-                try {
-                    const formData = new URLSearchParams();
-                    formData.append('description', trans.description);
-                    if (trans.amount) formData.append('amount', trans.amount);
-                    if (trans.date) formData.append('date', trans.date);
-                    
-                    const response = await fetch('/api/predict', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: formData
-                    });
-                    
-                    if (response.ok) {
-                        saved++;
-                    } else {
-                        errors++;
-                    }
-                } catch (error) {
-                    errors++;
-                }
-            }
-            
-            resultDiv.innerHTML = `<div class="success">Сохранено: ${saved}, ошибок: ${errors}</div>`;
-            loadStats();
-            
-            setTimeout(() => {
-                resultDiv.innerHTML = '';
-            }, 3000);
-        }
-        
-        function clearPreview() { 
-            previewData = []; 
-            document.getElementById('previewContainer').style.display = 'none'; 
-            document.getElementById('batchText').value = ''; 
-        }
-        
-        async function loadFromClipboard() {
-            try { 
-                const text = await navigator.clipboard.readText(); 
-                document.getElementById('batchText').value = text; 
-                parseAndPreview(); 
-            } 
-            catch (err) { 
-                alert('Не удалось прочитать буфер обмена'); 
-            }
         }
         
         async function clearHistory() {
