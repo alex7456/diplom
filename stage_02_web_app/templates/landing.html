@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartSpend - Умный учёт расходов</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #ffffff;
+            color: #1e293b;
+            line-height: 1.5;
+        }
+        
+        .navbar {
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 0 32px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.95);
+        }
+        
+        .logo {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+        
+        .nav-links a {
+            color: #475569;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        
+        .nav-links a:hover {
+            color: #2563eb;
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border: 1.5px solid #2563eb;
+            color: #2563eb;
+            padding: 8px 20px;
+            border-radius: 40px;
+        }
+        
+        .btn-outline:hover {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .hero {
+            padding: 80px 32px;
+            text-align: center;
+            background: linear-gradient(135deg, #f5f7fa 0%, #eef2f7 100%);
+        }
+        
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #1e293b, #2563eb);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 20px;
+        }
+        
+        .hero p {
+            font-size: 18px;
+            color: #64748b;
+            max-width: 600px;
+            margin: 0 auto 32px;
+        }
+        
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            padding: 12px 32px;
+            border-radius: 40px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: transform 0.2s;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #2563eb;
+            padding: 12px 32px;
+            border-radius: 40px;
+            font-weight: 600;
+            text-decoration: none;
+            border: 1.5px solid #2563eb;
+            transition: all 0.2s;
+        }
+        
+        .btn-secondary:hover {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .features {
+            padding: 80px 32px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .section-title {
+            text-align: center;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+        
+        .section-subtitle {
+            text-align: center;
+            color: #64748b;
+            margin-bottom: 48px;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+        }
+        
+        .feature-card {
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 32px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+        }
+        
+        .feature-card h3 {
+            font-size: 20px;
+            margin-bottom: 12px;
+            color: #0f172a;
+        }
+        
+        .feature-card p {
+            color: #64748b;
+            font-size: 14px;
+        }
+        
+        .stats-section {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            color: white;
+            padding: 60px 32px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 40px;
+            max-width: 1000px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        .stat-label {
+            color: #cbd5e1;
+            font-size: 18px;
+            font-weight: 500;
+            margin-top: 8px;
+        }
+        
+        .how-it-works {
+            padding: 80px 32px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .steps {
+            display: flex;
+            justify-content: space-between;
+            gap: 40px;
+            margin-top: 48px;
+            flex-wrap: wrap;
+        }
+        
+        .step {
+            flex: 1;
+            text-align: center;
+            min-width: 200px;
+        }
+        
+        .step-number {
+            width: 48px;
+            height: 48px;
+            background: #2563eb;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0 auto 16px;
+        }
+        
+        .tech-section {
+            background: #f8fafc;
+            padding: 80px 32px;
+            text-align: center;
+        }
+        
+        .tech-icons {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+            margin-top: 40px;
+        }
+        
+        .tech-icon {
+            background: white;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-weight: 500;
+            color: #1e293b;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .cta {
+            padding: 80px 32px;
+            text-align: center;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+        }
+        
+        .cta h2 {
+            font-size: 32px;
+            margin-bottom: 16px;
+        }
+        
+        .cta p {
+            margin-bottom: 32px;
+            opacity: 0.9;
+        }
+        
+        .cta .btn-primary {
+            background: white;
+            color: #2563eb;
+        }
+        
+        .footer {
+            background: #0f172a;
+            color: #94a3b8;
+            padding: 40px 32px;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 32px; }
+            .hero { padding: 60px 20px; }
+            .features { padding: 60px 20px; }
+            .step { min-width: 100%; }
+            .nav-links { gap: 12px; }
+            .navbar { padding: 0 16px; }
+            .stats-grid { gap: 24px; }
+            .stat-label { font-size: 14px; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">SmartSpend</div>
+        <div class="nav-links">
+            <a href="#features">Возможности</a>
+            <a href="#how-it-works">Как работает</a>
+            <a href="#tech">Технологии</a>
+            <a href="/app" class="btn-outline">Начать</a>
+        </div>
+    </nav>
+    
+    <section class="hero">
+        <h1>SmartSpend — умный учёт расходов<br>с помощью искусственного интеллекта</h1>
+        <p>Автоматическая категоризация транзакций, аналитика расходов и персональные рекомендации по экономии</p>
+        <div class="hero-buttons">
+            <a href="/app" class="btn-primary">Начать использовать</a>
+            <a href="#features" class="btn-secondary">Узнать больше</a>
+        </div>
+    </section>
+    
+    <section id="features" class="features">
+        <h2 class="section-title">Почему SmartSpend?</h2>
+        <p class="section-subtitle">Мощные функции для контроля финансов</p>
+        
+        <div class="features-grid">
+            <div class="feature-card">
+                <h3>ИИ категоризация</h3>
+                <p>Модель CatBoost автоматически определяет категорию по описанию транзакции</p>
+            </div>
+            <div class="feature-card">
+                <h3>Самообучение</h3>
+                <p>Модель учится на ваших исправлениях и становится точнее со временем</p>
+            </div>
+            <div class="feature-card">
+                <h3>Детальная аналитика</h3>
+                <p>Графики расходов по категориям, топ магазинов, динамика по дням недели</p>
+            </div>
+            <div class="feature-card">
+                <h3>Прогноз расходов</h3>
+                <p>ИИ предсказывает ваши траты на следующий месяц на основе истории</p>
+            </div>
+            <div class="feature-card">
+                <h3>Загрузка выписок</h3>
+                <p>Поддержка CSV и Excel из Т-Банка, Сбера, Альфы и других банков</p>
+            </div>
+            <div class="feature-card">
+                <h3>Контроль данных</h3>
+                <p>Локальное хранение, экспорт в Excel, полная история транзакций</p>
+            </div>
+        </div>
+    </section>
+    
+    <section class="stats-section">
+        <div class="stats-grid">
+            <div>
+                <div class="stat-label">Высокая точность</div>
+                <div class="stat-label" style="font-size: 14px; margin-top: 4px;">современный алгоритм CatBoost</div>
+            </div>
+            <div>
+                <div class="stat-label">Множество категорий</div>
+                <div class="stat-label" style="font-size: 14px; margin-top: 4px;">18 категорий расходов</div>
+            </div>
+            <div>
+                <div class="stat-label">Универсальность</div>
+                <div class="stat-label" style="font-size: 14px; margin-top: 4px;">поддержка популярных банков</div>
+            </div>
+            <div>
+                <div class="stat-label">Мгновенный результат</div>
+                <div class="stat-label" style="font-size: 14px; margin-top: 4px;">предсказание за миллисекунды</div>
+            </div>
+        </div>
+    </section>
+    
+    <section id="how-it-works" class="how-it-works">
+        <h2 class="section-title">Как это работает</h2>
+        <p class="section-subtitle">Три простых шага к финансовой осознанности</p>
+        
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h3>Добавьте транзакцию</h3>
+                <p>Введите описание, сумму и дату — ИИ определит категорию</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <h3>Исправьте при ошибке</h3>
+                <p>Поправьте категорию в истории — модель запомнит и дообучится</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <h3>Анализируйте и экономьте</h3>
+                <p>Смотрите графики, получайте прогноз и персональные рекомендации</p>
+            </div>
+        </div>
+    </section>
+    
+    <section id="tech" class="tech-section">
+        <h2 class="section-title">Технологии</h2>
+        <p class="section-subtitle">Современный стек для надёжной работы</p>
+        
+        <div class="tech-icons">
+            <span class="tech-icon">Python 3.11</span>
+            <span class="tech-icon">FastAPI</span>
+            <span class="tech-icon">CatBoost</span>
+            <span class="tech-icon">Chart.js</span>
+            <span class="tech-icon">SQLite</span>
+            <span class="tech-icon">Docker</span>
+        </div>
+    </section>
+    
+    <section class="cta">
+        <h2>Готовы начать экономить?</h2>
+        <p>Присоединяйтесь к тем, кто уже контролирует свои финансы с SmartSpend</p>
+        <a href="/app" class="btn-primary">Начать использование</a>
+    </section>
+    
+    <footer class="footer">
+        <p>SmartSpend — дипломный проект по автоматической категоризации личных расходов</p>
+        <p style="margin-top: 8px;">© 2026 Все права защищены</p>
+    </footer>
+</body>
+</html>

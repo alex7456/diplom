@@ -73,8 +73,8 @@ async def startup_event():
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    """Главная страница"""
-    return templates.TemplateResponse("login.html", {"request": request})
+    """Главная страница (лендинг)"""
+    return templates.TemplateResponse("landing.html", {"request": request})
 
 
 @app.get("/app", response_class=HTMLResponse)
