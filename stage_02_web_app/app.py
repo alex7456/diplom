@@ -581,6 +581,18 @@ async def get_manual_weekly_spending(db: Session = Depends(get_db)):
     analytics = AnalyticsService(db)
     return analytics.get_weekly_spending(1, is_auto=True)
 
+@app.get("/api/analytics/manual/predict")
+async def get_manual_predict(db: Session = Depends(get_db)):
+    """Прогноз расходов (ручной ввод)"""
+    analytics = AnalyticsService(db)
+    return analytics.predict_next_month_expenses(1, is_auto=True)
+
+@app.get("/api/analytics/bank/predict")
+async def get_bank_predict(db: Session = Depends(get_db)):
+    """Прогноз расходов (выписки)"""
+    analytics = AnalyticsService(db)
+    return analytics.predict_next_month_expenses(1, is_auto=False)
+
 
 def auto_retrain_if_needed(db: Session):
     """Автоматическое дообучение после КАЖДОГО исправления"""

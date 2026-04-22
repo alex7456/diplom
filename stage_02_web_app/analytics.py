@@ -222,3 +222,113 @@ class AnalyticsService:
                 weekly[weekdays[weekday_num]] += abs(t.amount)
         
         return dict(weekly)
+    
+    def predict_next_month_expenses(self, user_id: int, is_auto: bool = None) -> Dict:
+        """
+        Адаптивный прогноз расходов на следующий месяц
+        """
+        from sklearn.linear_model import LinearRegression
+        import numpy as np
+        from datetime import datetime, timedelta
+        
+        # Получаем транзакции
+        query = self.db.query(Transaction).filter(
+            Transaction.user_id == user_id,
+            Transaction.amount < 0
+        )
+        
+        if is_auto is not None:
+            query = query.filter(Transaction.is_auto == is_auto)
+        
+        transactions = query.all()
+        
+        if not transactions:
+            return {
+                'prediction': 0,
+                'prediction_rub': 0,
+                'confidence': 'low',
+                'trend': 'stable',
+                'days_used': 0,
+                'message': 'Недостаточно данных для прогноза'
+            }
+        
+        # Группируем по дням
+        daily_totals = defaultdict(float)
+        for t in transactions:
+            if t.amount and t.amount < 0:
+                day_key = t.created_at.strftime('%Y-%m-%d')
+                daily_totals[day_key] += abs(t.amount)
+        
+        days = sorted(daily_totals.keys())
+        daily_amounts = [daily_totals[d] for d in days]
+        
+        if len(days) == 0:
+            return {
+                'prediction': 0,
+                'prediction_rub': 0,
+                'confidence': 'low',
+                'trend': 'stable',
+                'days_used': 0,
+                'message': 'Недостаточно данных для прогноза'
+            }
+        
+        # Общая сумма расходов за период
+        total_expenses = sum(daily_amounts)
+        days_count = len(days)
+        
+        # Средняя дневная сумма
+        avg_daily = total_expenses / days_count
+        
+        # Базовый прогноз на месяц (30 дней)
+        prediction = avg_daily * 30
+        
+        # Корректировка в зависимости от количества дней
+        if days_count < 7:
+            confidence = 'low'
+            # При малом количестве данных прогноз более консервативный
+            prediction = prediction * 0.7
+        elif days_count < 14:
+            confidence = 'medium'
+        else:
+            confidence = 'high'
+        
+        # Ограничиваем прогноз разумными пределами
+        max_prediction = total_expenses * 3  # не более чем в 3 раза
+        min_prediction = total_expenses * 0.5  # не менее чем в 0.5 раза
+        prediction = max(min_prediction, min(prediction, max_prediction))
+        
+        # Изменение относительно текущего периода
+        change_percent = ((prediction - total_expenses) / total_expenses * 100) if total_expenses > 0 else 0
+        change_percent = max(min(change_percent, 100), -50)
+        
+        # Определяем тренд
+        if change_percent > 20:
+            trend = 'increase'
+        elif change_percent < -20:
+            trend = 'decrease'
+        else:
+            trend = 'stable'
+        
+        # Группируем по неделям для отображения
+        weeks_data = defaultdict(float)
+        for t in transactions:
+            if t.amount and t.amount < 0:
+                week_num = t.created_at.isocalendar()[1]
+                year = t.created_at.year
+                week_key = f"{year}-W{week_num:02d}"
+                weeks_data[week_key] += abs(t.amount)
+        
+        weeks = sorted(weeks_data.keys())
+        
+        return {
+            'prediction': round(prediction, 2),
+            'prediction_rub': round(prediction, 2),
+            'estimated_current': round(total_expenses, 2),
+            'change_percent': round(change_percent, 1),
+            'confidence': confidence,
+            'trend': trend,
+            'days_used': days_count,
+            'weeks_used': len(weeks),
+            'avg_daily': round(avg_daily, 2),
+            'message': f'Прогноз на месяц: {round(prediction, 2):,} ₽'
+        }

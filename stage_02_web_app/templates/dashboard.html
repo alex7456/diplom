@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expense Categorizer - Аналитика</title>
+    <title>SmartSpend - Аналитика</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -127,6 +127,59 @@
         
         .tab-content.active {
             display: block;
+        }
+        
+        /* Карточка прогноза */
+        .prediction-card {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 32px;
+            color: white;
+        }
+        
+        .prediction-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .prediction-header h3 {
+            font-size: 16px;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+        
+        .confidence-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .confidence-badge.high { background: #10b981; }
+        .confidence-badge.medium { background: #f59e0b; }
+        .confidence-badge.low { background: #ef4444; }
+        
+        .prediction-value {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .prediction-change {
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        
+        .prediction-change.positive { color: #10b981; }
+        .prediction-change.negative { color: #ef4444; }
+        .prediction-change.neutral { color: #94a3b8; }
+        
+        .prediction-info {
+            font-size: 13px;
+            opacity: 0.7;
         }
         
         .upload-card {
@@ -264,12 +317,15 @@
                 padding: 10px 16px;
                 font-size: 13px;
             }
+            .prediction-value {
+                font-size: 28px;
+            }
         }
     </style>
 </head>
 <body>
     <nav class="navbar">
-        <div class="logo">Expense Categorizer</div>
+        <div class="logo">SmartSpend</div>
         <div class="nav-links">
             <a href="/app">Транзакции</a>
             <a href="/dashboard">Аналитика</a>
@@ -304,6 +360,17 @@
                     <div class="stat-value" id="manualTotalTransactions">—</div>
                     <div class="stat-label">Транзакций</div>
                 </div>
+            </div>
+            
+            <!-- Прогноз -->
+            <div class="prediction-card">
+                <div class="prediction-header">
+                    <h3>Прогноз на следующий месяц</h3>
+                    <span class="confidence-badge" id="manualConfidence">—</span>
+                </div>
+                <div class="prediction-value" id="manualPrediction">—</div>
+                <div class="prediction-change" id="manualChange"></div>
+                <div class="prediction-info" id="manualInfo"></div>
             </div>
             
             <div class="charts-grid">
@@ -359,6 +426,17 @@
                     <div class="stat-value" id="bankTotalTransactions">—</div>
                     <div class="stat-label">Транзакций</div>
                 </div>
+            </div>
+            
+            <!-- Прогноз для выписок -->
+            <div class="prediction-card">
+                <div class="prediction-header">
+                    <h3>Прогноз на следующий месяц</h3>
+                    <span class="confidence-badge" id="bankConfidence">—</span>
+                </div>
+                <div class="prediction-value" id="bankPrediction">—</div>
+                <div class="prediction-change" id="bankChange"></div>
+                <div class="prediction-info" id="bankInfo"></div>
             </div>
             
             <div class="charts-grid">
@@ -426,10 +504,68 @@
                 document.querySelector('.tab-btn').classList.add('active');
                 document.getElementById('manualTab').classList.add('active');
                 loadManualAnalytics();
+                loadManualPrediction();
             } else {
                 document.querySelectorAll('.tab-btn')[1].classList.add('active');
                 document.getElementById('bankTab').classList.add('active');
                 loadBankAnalytics();
+                loadBankPrediction();
+            }
+        }
+        
+        async function loadManualPrediction() {
+            try {
+                const response = await fetch('/api/analytics/manual/predict');
+                const data = await response.json();
+                
+                if (data && data.prediction_rub) {
+                    document.getElementById('manualPrediction').textContent = `${data.prediction_rub.toLocaleString()} ₽`;
+                    
+                    const confidenceEl = document.getElementById('manualConfidence');
+                    confidenceEl.textContent = data.confidence === 'high' ? 'Высокая' : (data.confidence === 'medium' ? 'Средняя' : 'Низкая');
+                    confidenceEl.className = `confidence-badge ${data.confidence}`;
+                    
+                    const changeEl = document.getElementById('manualChange');
+                    const changeClass = data.trend === 'increase' ? 'positive' : (data.trend === 'decrease' ? 'negative' : 'neutral');
+                    const changeSign = data.change_percent > 0 ? '+' : '';
+                    changeEl.innerHTML = `${changeSign}${data.change_percent}% к прошлому месяцу`;
+                    changeEl.className = `prediction-change ${changeClass}`;
+                    
+                    document.getElementById('manualInfo').textContent = `На основе ${data.weeks_used || data.months_used || 0} недель`;
+                } else {
+                    document.getElementById('manualPrediction').textContent = 'Нет данных';
+                }
+            } catch (error) {
+                console.error('Error loading manual prediction:', error);
+                document.getElementById('manualPrediction').textContent = 'Ошибка загрузки';
+            }
+        }
+        
+        async function loadBankPrediction() {
+            try {
+                const response = await fetch('/api/analytics/bank/predict');
+                const data = await response.json();
+                
+                if (data && data.prediction_rub) {
+                    document.getElementById('bankPrediction').textContent = `${data.prediction_rub.toLocaleString()} ₽`;
+                    
+                    const confidenceEl = document.getElementById('bankConfidence');
+                    confidenceEl.textContent = data.confidence === 'high' ? 'Высокая' : (data.confidence === 'medium' ? 'Средняя' : 'Низкая');
+                    confidenceEl.className = `confidence-badge ${data.confidence}`;
+                    
+                    const changeEl = document.getElementById('bankChange');
+                    const changeClass = data.trend === 'increase' ? 'positive' : (data.trend === 'decrease' ? 'negative' : 'neutral');
+                    const changeSign = data.change_percent > 0 ? '+' : '';
+                    changeEl.innerHTML = `${changeSign}${data.change_percent}% к прошлому месяцу`;
+                    changeEl.className = `prediction-change ${changeClass}`;
+                    
+                    document.getElementById('bankInfo').textContent = `На основе ${data.weeks_used || data.months_used || 0} недель`;
+                } else {
+                    document.getElementById('bankPrediction').textContent = 'Нет данных';
+                }
+            } catch (error) {
+                console.error('Error loading bank prediction:', error);
+                document.getElementById('bankPrediction').textContent = 'Ошибка загрузки';
             }
         }
         
@@ -496,82 +632,82 @@
         }
         
         async function loadBankAnalytics() {
-    try {
-        const response = await fetch('/api/analytics/bank');
-        const data = await response.json();
-        
-        document.getElementById('bankTotalExpenses').textContent = Math.round(data.total_expenses || 0).toLocaleString();
-        document.getElementById('bankTotalIncome').textContent = Math.round(data.total_income || 0).toLocaleString();
-        document.getElementById('bankTotalTransactions').textContent = data.total_transactions || 0;
-        
-        // Расходы по категориям (круговая)
-        const categories = Object.keys(data.categories || {});
-        const amounts = categories.map(c => data.categories[c].total);
-        const colors = categories.map(c => categoryColors[c] || '#94a3b8');
-        
-        if (bankCategoryChart) bankCategoryChart.destroy();
-        if (categories.length > 0) {
-            bankCategoryChart = new Chart(document.getElementById('bankCategoryChart'), {
-                type: 'pie',
-                data: { labels: categories, datasets: [{ data: amounts, backgroundColor: colors, borderWidth: 0 }] },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-        }
-        
-        // Топ магазинов
-        const merchants = data.top_merchants || [];
-        if (bankMerchantChart) bankMerchantChart.destroy();
-        if (merchants.length > 0) {
-            bankMerchantChart = new Chart(document.getElementById('bankMerchantChart'), {
-                type: 'bar',
-                data: { labels: merchants.map(m => m.name), datasets: [{ label: 'Сумма (₽)', data: merchants.map(m => m.total), backgroundColor: '#f59e0b' }] },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
-            });
-        }
-        
-        // ЕЖЕДНЕВНЫЕ РАСХОДЫ (ИСПРАВЛЕНО)
-        const daily = data.daily || {};
-        const days = Object.keys(daily).sort();
-        const dailyAmounts = days.map(d => daily[d]);
-        
-        if (bankDailyChart) bankDailyChart.destroy();
-        if (days.length > 0) {
-            bankDailyChart = new Chart(document.getElementById('bankDailyChart'), {
-                type: 'bar',
-                data: {
-                    labels: days,
-                    datasets: [{
-                        label: 'Расходы за день (₽)',
-                        data: dailyAmounts,
-                        backgroundColor: '#10b981',
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: { y: { beginAtZero: true } }
+            try {
+                const response = await fetch('/api/analytics/bank');
+                const data = await response.json();
+                
+                document.getElementById('bankTotalExpenses').textContent = Math.round(data.total_expenses || 0).toLocaleString();
+                document.getElementById('bankTotalIncome').textContent = Math.round(data.total_income || 0).toLocaleString();
+                document.getElementById('bankTotalTransactions').textContent = data.total_transactions || 0;
+                
+                // Расходы по категориям (круговая)
+                const categories = Object.keys(data.categories || {});
+                const amounts = categories.map(c => data.categories[c].total);
+                const colors = categories.map(c => categoryColors[c] || '#94a3b8');
+                
+                if (bankCategoryChart) bankCategoryChart.destroy();
+                if (categories.length > 0) {
+                    bankCategoryChart = new Chart(document.getElementById('bankCategoryChart'), {
+                        type: 'pie',
+                        data: { labels: categories, datasets: [{ data: amounts, backgroundColor: colors, borderWidth: 0 }] },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
                 }
-            });
-        } else {
-            document.getElementById('bankDailyChart').parentElement.innerHTML = '<div style="text-align:center;padding:50px;">Нет данных</div>';
+                
+                // Топ магазинов
+                const merchants = data.top_merchants || [];
+                if (bankMerchantChart) bankMerchantChart.destroy();
+                if (merchants.length > 0) {
+                    bankMerchantChart = new Chart(document.getElementById('bankMerchantChart'), {
+                        type: 'bar',
+                        data: { labels: merchants.map(m => m.name), datasets: [{ label: 'Сумма (₽)', data: merchants.map(m => m.total), backgroundColor: '#f59e0b' }] },
+                        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+                    });
+                }
+                
+                // ЕЖЕДНЕВНЫЕ РАСХОДЫ
+                const daily = data.daily || {};
+                const days = Object.keys(daily).sort();
+                const dailyAmounts = days.map(d => daily[d]);
+                
+                if (bankDailyChart) bankDailyChart.destroy();
+                if (days.length > 0) {
+                    bankDailyChart = new Chart(document.getElementById('bankDailyChart'), {
+                        type: 'bar',
+                        data: {
+                            labels: days,
+                            datasets: [{
+                                label: 'Расходы за день (₽)',
+                                data: dailyAmounts,
+                                backgroundColor: '#10b981',
+                                borderRadius: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: { y: { beginAtZero: true } }
+                        }
+                    });
+                } else {
+                    document.getElementById('bankDailyChart').parentElement.innerHTML = '<div style="text-align:center;padding:50px;">Нет данных</div>';
+                }
+                
+                // Топ категорий расходов
+                const sorted = Object.entries(data.categories || {}).sort((a, b) => b[1].total - a[1].total).slice(0, 8);
+                if (bankTopCategoriesChart) bankTopCategoriesChart.destroy();
+                if (sorted.length > 0) {
+                    bankTopCategoriesChart = new Chart(document.getElementById('bankTopCategoriesChart'), {
+                        type: 'bar',
+                        data: { labels: sorted.map(s => s[0]), datasets: [{ label: 'Сумма (₽)', data: sorted.map(s => s[1].total), backgroundColor: '#3b82f6' }] },
+                        options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true } } }
+                    });
+                }
+                
+            } catch (error) {
+                console.error('Error loading bank analytics:', error);
+            }
         }
-        
-        // Топ категорий расходов
-        const sorted = Object.entries(data.categories || {}).sort((a, b) => b[1].total - a[1].total).slice(0, 8);
-        if (bankTopCategoriesChart) bankTopCategoriesChart.destroy();
-        if (sorted.length > 0) {
-            bankTopCategoriesChart = new Chart(document.getElementById('bankTopCategoriesChart'), {
-                type: 'bar',
-                data: { labels: sorted.map(s => s[0]), datasets: [{ label: 'Сумма (₽)', data: sorted.map(s => s[1].total), backgroundColor: '#3b82f6' }] },
-                options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true } } }
-            });
-        }
-        
-    } catch (error) {
-        console.error('Error loading bank analytics:', error);
-    }
-}
         
         async function uploadBankStatement() {
             const file = document.getElementById('bankFile').files[0];
@@ -591,6 +727,7 @@
                 if (response.ok) {
                     resultDiv.innerHTML = `<div class="upload-stats"><h4>Загрузка завершена</h4><p>Обработано: ${data.total} транзакций</p><p>Расходы: ${Math.abs(data.total_expenses || 0).toLocaleString()} ₽</p><p>Доходы: ${Math.abs(data.total_income || 0).toLocaleString()} ₽</p><button onclick="location.reload()">Обновить</button></div>`;
                     loadBankAnalytics();
+                    loadBankPrediction();
                 } else {
                     resultDiv.innerHTML = `<div class="error">Ошибка: ${data.detail}</div>`;
                 }
@@ -603,6 +740,7 @@
         
         setActiveNav();
         loadManualAnalytics();
+        loadManualPrediction();
     </script>
 </body>
 </html>
