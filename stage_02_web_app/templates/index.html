@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expense Categorizer</title>
+    <title>SmartSpend - Транзакции</title>
     <style>
         * {
             margin: 0;
@@ -106,6 +106,103 @@
             background: linear-gradient(135deg, #10b981, #059669);
             padding: 6px 16px;
             font-size: 13px;
+        }
+        
+        /* Стили для шаблонов */
+        .templates-section {
+            margin-bottom: 20px;
+        }
+        
+        .templates-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .templates-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .template-btn {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #1e293b;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .template-btn:hover {
+            background: #eef2ff;
+            border-color: #2563eb;
+            color: #2563eb;
+            transform: translateY(-1px);
+        }
+        
+        .add-template-btn {
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            color: #64748b;
+        }
+        
+        .add-template-btn:hover {
+            background: #eef2ff;
+            border-color: #2563eb;
+            color: #2563eb;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 28px;
+            max-width: 400px;
+            width: 90%;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .modal-close {
+            background: none;
+            color: #64748b;
+            font-size: 24px;
+            padding: 0;
+            cursor: pointer;
         }
         
         .form-group {
@@ -407,7 +504,7 @@
 </head>
 <body>
     <nav class="navbar">
-        <div class="logo">Expense Categorizer</div>
+        <div class="logo">SmartSpend</div>
         <div class="nav-links">
             <a href="/app">Транзакции</a>
             <a href="/dashboard">Аналитика</a>
@@ -422,6 +519,21 @@
             <div class="card-title">
                 Новые транзакции
                 <button onclick="addTransactionForm()" class="add-transaction-btn">+ Добавить транзакцию</button>
+            </div>
+            
+            <!-- Быстрые шаблоны -->
+            <div class="templates-section">
+                <div class="templates-title">Быстрые шаблоны</div>
+                <div class="templates-grid" id="templatesGrid">
+                    <button class="template-btn" onclick="applyTemplateToActive('Пятерочка', -450)">Пятерочка</button>
+                    <button class="template-btn" onclick="applyTemplateToActive('Магнит', -500)">Магнит</button>
+                    <button class="template-btn" onclick="applyTemplateToActive('Яндекс Такси', -300)">Яндекс Такси</button>
+                    <button class="template-btn" onclick="applyTemplateToActive('Uber', -350)">Uber</button>
+                    <button class="template-btn" onclick="applyTemplateToActive('WB', -1500)">WB</button>
+                    <button class="template-btn" onclick="applyTemplateToActive('Ozon', -1200)">Ozon</button>
+                    <button class="template-btn" onclick="applyTemplateToActive('Яндекс Плюс', -399)">Яндекс Плюс</button>
+                    <button class="template-btn add-template-btn" onclick="openTemplateModal()">+ Свой шаблон</button>
+                </div>
             </div>
             
             <div id="transactionsContainer" class="transactions-list">
@@ -485,8 +597,113 @@
         </div>
     </div>
     
+    <!-- Модальное окно для добавления шаблона -->
+    <div id="templateModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Добавить шаблон</h3>
+                <button class="modal-close" onclick="closeTemplateModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>Название</label>
+                <input type="text" id="templateName" placeholder="Например: Перекресток">
+            </div>
+            <div class="form-group">
+                <label>Сумма (₽)</label>
+                <input type="number" id="templateAmount" step="0.01" placeholder="Отрицательная для расходов">
+            </div>
+            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                <button onclick="saveUserTemplate()" class="btn-success">Сохранить</button>
+                <button onclick="closeTemplateModal()" class="btn-secondary">Отмена</button>
+            </div>
+        </div>
+    </div>
+    
     <script>
         let nextId = 1;
+        let userTemplates = [];
+        
+        // Загрузка сохранённых шаблонов
+        function loadTemplates() {
+            const saved = localStorage.getItem('smartspend_templates');
+            if (saved) {
+                userTemplates = JSON.parse(saved);
+                renderUserTemplates();
+            }
+        }
+        
+        function renderUserTemplates() {
+            const grid = document.getElementById('templatesGrid');
+            // Удаляем старые пользовательские шаблоны (оставляем только быстрые и кнопку добавления)
+            const allButtons = grid.querySelectorAll('.template-btn');
+            for (const btn of allButtons) {
+                if (btn.classList.contains('user-template')) {
+                    btn.remove();
+                }
+            }
+            const addBtn = grid.querySelector('.add-template-btn');
+            
+            // Добавляем пользовательские шаблоны перед кнопкой "+ Свой шаблон"
+            for (const t of userTemplates) {
+                const btn = document.createElement('button');
+                btn.className = 'template-btn user-template';
+                btn.textContent = t.name;
+                btn.onclick = () => applyTemplateToActive(t.name, t.amount);
+                grid.insertBefore(btn, addBtn);
+            }
+        }
+        
+        function applyTemplateToActive(name, amount) {
+            // Находим последнюю (активную) транзакцию или первую пустую
+            const transactions = document.querySelectorAll('.transaction-item');
+            let targetTransaction = transactions[transactions.length - 1];
+            
+            // Проверяем, есть ли уже описание в последней транзакции
+            const lastDesc = targetTransaction.querySelector('.trans-desc')?.value.trim();
+            if (lastDesc) {
+                // Если последняя заполнена, создаём новую
+                addTransactionForm();
+                targetTransaction = document.querySelector('.transaction-item:last-child');
+            }
+            
+            const descField = targetTransaction.querySelector('.trans-desc');
+            const amountField = targetTransaction.querySelector('.trans-amount');
+            
+            if (descField) descField.value = name;
+            if (amountField) amountField.value = amount;
+            
+            // Прокручиваем к полю описания
+            descField?.focus();
+        }
+        
+        function openTemplateModal() {
+            document.getElementById('templateModal').classList.add('active');
+            document.getElementById('templateName').value = '';
+            document.getElementById('templateAmount').value = '';
+        }
+        
+        function closeTemplateModal() {
+            document.getElementById('templateModal').classList.remove('active');
+        }
+        
+        function saveUserTemplate() {
+            const name = document.getElementById('templateName').value.trim();
+            const amount = parseFloat(document.getElementById('templateAmount').value);
+            
+            if (!name) {
+                alert('Введите название шаблона');
+                return;
+            }
+            if (isNaN(amount)) {
+                alert('Введите сумму');
+                return;
+            }
+            
+            userTemplates.push({ name: name, amount: amount });
+            localStorage.setItem('smartspend_templates', JSON.stringify(userTemplates));
+            renderUserTemplates();
+            closeTemplateModal();
+        }
         
         async function loadStats() {
             try {
@@ -590,7 +807,6 @@
             const container = document.getElementById('transactionsContainer');
             container.innerHTML = '';
             
-            // Добавляем одну пустую форму
             nextId = 1;
             const newTransaction = document.createElement('div');
             newTransaction.className = 'transaction-item';
@@ -623,91 +839,87 @@
         }
         
         async function saveAllTransactions() {
-    const transactions = getAllTransactions();
-    
-    if (transactions.length === 0) {
-        alert('Нет транзакций для сохранения');
-        return;
-    }
-    
-    const resultDiv = document.getElementById('batchResult');
-    resultDiv.innerHTML = '<div class="loading"></div> Сохранение...';
-    resultDiv.classList.add('show');
-    
-    let saved = 0;
-    let errors = 0;
-    const results = [];
-    
-    for (let i = 0; i < transactions.length; i++) {
-        const trans = transactions[i];
-        
-        try {
-            const formData = new URLSearchParams();
-            formData.append('description', trans.description);
-            if (trans.amount) formData.append('amount', trans.amount);
-            if (trans.date) formData.append('date', trans.date);
+            const transactions = getAllTransactions();
             
-            const response = await fetch('/api/predict', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                saved++;
-                results.push({
-                    description: trans.description,
-                    category: data.predicted_category,
-                    status: 'success'
-                });
-            } else {
-                errors++;
-                results.push({
-                    description: trans.description,
-                    category: 'Ошибка',
-                    status: 'error'
-                });
+            if (transactions.length === 0) {
+                alert('Нет транзакций для сохранения');
+                return;
             }
-        } catch (error) {
-            errors++;
-            results.push({
-                description: trans.description,
-                category: 'Ошибка',
-                status: 'error'
-            });
+            
+            const resultDiv = document.getElementById('batchResult');
+            resultDiv.innerHTML = '<div class="loading"></div> Сохранение...';
+            resultDiv.classList.add('show');
+            
+            let saved = 0;
+            let errors = 0;
+            const results = [];
+            
+            for (let i = 0; i < transactions.length; i++) {
+                const trans = transactions[i];
+                
+                try {
+                    const formData = new URLSearchParams();
+                    formData.append('description', trans.description);
+                    if (trans.amount) formData.append('amount', trans.amount);
+                    if (trans.date) formData.append('date', trans.date);
+                    
+                    const response = await fetch('/api/predict', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        saved++;
+                        results.push({
+                            description: trans.description,
+                            category: data.predicted_category,
+                            status: 'success'
+                        });
+                    } else {
+                        errors++;
+                        results.push({
+                            description: trans.description,
+                            category: 'Ошибка',
+                            status: 'error'
+                        });
+                    }
+                } catch (error) {
+                    errors++;
+                    results.push({
+                        description: trans.description,
+                        category: 'Ошибка',
+                        status: 'error'
+                    });
+                }
+            }
+            
+            let html = `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <div class="success">Сохранено: ${saved}, ошибок: ${errors}</div>
+                            <button onclick="closeBatchResult()" style="background: #64748b; padding: 6px 16px;">Закрыть</button>
+                        </div>`;
+            html += '<div class="results-list" style="max-height: 300px; overflow-y: auto;"><strong>Результаты:</strong>';
+            for (const r of results) {
+                const icon = r.status === 'success' ? '✓' : '✗';
+                html += `<div class="result-item" style="padding: 8px; margin-bottom: 6px;">${icon} ${escapeHtml(r.description)} → <span class="category-badge category-${r.category}" style="font-size: 11px; padding: 2px 10px;">${r.category}</span></div>`;
+            }
+            html += '</div>';
+            
+            resultDiv.innerHTML = html;
+            loadStats();
+            
+            if (errors === 0 && saved > 0) {
+                resultDiv.innerHTML += `<div style="margin-top: 16px;"><button onclick="clearAllTransactions()" class="btn-secondary" style="width: 100%;">Очистить формы</button></div>`;
+            }
         }
-    }
-    
-    // Показать результаты (без автоматического исчезновения)
-    let html = `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <div class="success">✅ Сохранено: ${saved}, ❌ ошибок: ${errors}</div>
-                    <button onclick="closeBatchResult()" style="background: #64748b; padding: 6px 16px;">Закрыть</button>
-                </div>`;
-    html += '<div class="results-list" style="max-height: 300px; overflow-y: auto;"><strong>Результаты:</strong>';
-    for (const r of results) {
-        const icon = r.status === 'success' ? '✅' : '❌';
-        html += `<div class="result-item" style="padding: 8px; margin-bottom: 6px;">${icon} ${escapeHtml(r.description)} → <span class="category-badge category-${r.category}" style="font-size: 11px; padding: 2px 10px;">${r.category}</span></div>`;
-    }
-    html += '</div>';
-    
-    resultDiv.innerHTML = html;
-    loadStats();
-    
-    // НЕ очищаем формы автоматически, пусть пользователь решит
-    if (errors === 0 && saved > 0) {
-        // Показываем кнопку очистки форм
-        const clearBtn = document.createElement('button');
-        resultDiv.innerHTML += `<div style="margin-top: 16px;"><button onclick="clearAllTransactions()" class="btn-secondary" style="width: 100%;">🗑️ Очистить формы</button></div>`;
-    }
-}
-
-function closeBatchResult() {
-    const resultDiv = document.getElementById('batchResult');
-    resultDiv.classList.remove('show');
-    resultDiv.innerHTML = '';
-}
+        
+        function closeBatchResult() {
+            const resultDiv = document.getElementById('batchResult');
+            resultDiv.classList.remove('show');
+            resultDiv.innerHTML = '';
+        }
         
         function escapeHtml(text) { 
             const div = document.createElement('div'); 
@@ -739,6 +951,7 @@ function closeBatchResult() {
         }
         
         loadStats();
+        loadTemplates();
         setInterval(loadStats, 30000);
     </script>
 </body>

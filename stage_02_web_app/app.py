@@ -593,6 +593,141 @@ async def get_bank_predict(db: Session = Depends(get_db)):
     analytics = AnalyticsService(db)
     return analytics.predict_next_month_expenses(1, is_auto=False)
 
+@app.get("/api/analytics/insights")
+async def get_insights(
+    db: Session = Depends(get_db),
+    source: str = "manual"
+):
+    """
+    Анализ расходов и персональные рекомендации
+    """
+    analytics = AnalyticsService(db)
+    
+    # Определяем источник данных
+    is_auto = True if source == "manual" else False
+    
+    # Проверяем, есть ли данные для выписок
+    if source == "bank":
+        bank_stats = analytics.get_analytics_by_source(1, is_auto=False)
+        if bank_stats.get('total_transactions', 0) == 0:
+            return {
+                "insights": [],
+                "total_expenses": 0,
+                "recommendations_count": 0,
+                "period_days": 30,
+                "message": "Нет загруженных выписок"
+            }
+    
+    # Получаем данные с учётом источника
+    breakdown = analytics.get_category_breakdown(1, is_auto=is_auto)
+    monthly = analytics.get_monthly_trend(1, 3, is_auto=is_auto)
+    top_merchants = analytics.get_top_merchants(1, 10, is_auto=is_auto)
+    weekly = analytics.get_weekly_spending(1, is_auto=is_auto)
+    
+    insights = []
+    
+    # 1. Анализ по категориям
+    categories = breakdown.get('categories', {})
+    total_expenses = breakdown.get('total_expenses', 0)
+    
+    norms = {
+        'Кафе': 5000, 'Такси': 3000, 'Каршеринг': 2000,
+        'Развлечения': 4000, 'Одежда': 8000, 'Аптеки': 2000,
+        'Продукты': 15000, 'Подписки': 1000, 'Маркетплейсы': 5000
+    }
+    
+    for category, data in categories.items():
+        spent = data.get('total', 0)
+        if category in norms and spent > norms[category]:
+            excess = spent - norms[category]
+            percent = (excess / norms[category]) * 100
+            insights.append({
+                "type": "warning",
+                "title": f"Перерасход в категории «{category}»",
+                "message": f"Вы потратили {spent:.0f} ₽, что на {excess:.0f} ₽ ({percent:.0f}%) больше нормы",
+                "suggestion": f"Рекомендуем сократить расходы на {int(excess * 0.3)}-{int(excess * 0.5)} ₽"
+            })
+    
+    # 2. Анализ частых покупок
+    for merchant, total, count in top_merchants[:3]:
+        if total > 3000:
+            insights.append({
+                "type": "info",
+                "title": f"Частые покупки в «{merchant}»",
+                "message": f"За последнее время вы потратили {total:.0f} ₽ ({count} покупок)",
+                "suggestion": "Попробуйте поискать альтернативы или покупать по акциям"
+            })
+    
+    # 3. Анализ кафе
+    cafe_spent = categories.get('Кафе', {}).get('total', 0)
+    if cafe_spent > 3000:
+        savings = cafe_spent * 0.4
+        insights.append({
+            "type": "saving",
+            "title": "Экономия на обедах",
+            "message": f"Вы тратите {cafe_spent:.0f} ₽ на кафе и рестораны",
+            "suggestion": f"Готовьте обед дома — можно сэкономить до {savings:.0f} ₽!"
+        })
+    
+    # 4. Анализ транспорта
+    taxi_spent = categories.get('Такси', {}).get('total', 0)
+    carsharing_spent = categories.get('Каршеринг', {}).get('total', 0)
+    transport_spent = taxi_spent + carsharing_spent
+    
+    if transport_spent > 2000:
+        savings = transport_spent * 0.5
+        insights.append({
+            "type": "saving",
+            "title": "Экономия на транспорте",
+            "message": f"Вы тратите {transport_spent:.0f} ₽ на такси и каршеринг",
+            "suggestion": f"Используйте общественный транспорт — экономия до {savings:.0f} ₽!"
+        })
+    
+    # 5. Анализ подписок
+    subscriptions_spent = categories.get('Подписки', {}).get('total', 0)
+    if subscriptions_spent > 500:
+        insights.append({
+            "type": "info",
+            "title": "Проверьте подписки",
+            "message": f"Вы тратите {subscriptions_spent:.0f} ₽ на подписки в месяц",
+            "suggestion": "Откажитесь от неиспользуемых подписок — экономия до 30%"
+        })
+    
+    # 6. Общая рекомендация
+    if total_expenses > 30000:
+        savings_potential = total_expenses * 0.15
+        insights.append({
+            "type": "warning",
+            "title": "Анализ общей картины",
+            "message": f"Ваши расходы за месяц: {total_expenses:.0f} ₽",
+            "suggestion": f"Потенциал экономии: ~{savings_potential:.0f} ₽"
+        })
+    elif 0 < total_expenses < 15000:
+        insights.append({
+            "type": "success",
+            "title": "Отличная финансовая дисциплина!",
+            "message": f"Ваши расходы ({total_expenses:.0f} ₽) ниже среднего уровня",
+            "suggestion": "Продолжайте в том же духе!"
+        })
+    
+    # 7. Основная статья расходов
+    if categories:
+        top_category = max(categories.items(), key=lambda x: x[1]['total'])
+        if top_category[1]['total'] > total_expenses * 0.4:
+            insights.append({
+                "type": "info",
+                "title": f"Основная статья расходов — {top_category[0]}",
+                "message": f"На {top_category[0]} уходит {(top_category[1]['total']/total_expenses*100):.0f}% всех трат",
+                "suggestion": "Проанализируйте, можно ли оптимизировать расходы в этой категории"
+            })
+    
+    return {
+        "insights": insights,
+        "total_expenses": total_expenses,
+        "recommendations_count": len(insights),
+        "period_days": 30
+    }
+
 
 def auto_retrain_if_needed(db: Session):
     """Автоматическое дообучение после КАЖДОГО исправления"""

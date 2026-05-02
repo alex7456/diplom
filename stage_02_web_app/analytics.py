@@ -332,3 +332,105 @@ class AnalyticsService:
             'avg_daily': round(avg_daily, 2),
             'message': f'Прогноз на месяц: {round(prediction, 2):,} ₽'
         }
+    
+
+    def get_monthly_trend(self, user_id: int, months: int = 6, is_auto: bool = None) -> Dict[str, Dict]:
+        """Динамика расходов по месяцам с фильтром по источнику"""
+        query = self.db.query(Transaction).filter(
+            Transaction.user_id == user_id,
+            Transaction.amount < 0
+        )
+        
+        if is_auto is not None:
+            query = query.filter(Transaction.is_auto == is_auto)
+        
+        transactions = query.all()
+        
+        monthly_data = defaultdict(lambda: defaultdict(float))
+        
+        for t in transactions:
+            if t.amount and t.amount < 0:
+                month_key = t.created_at.strftime('%Y-%m')
+                category = t.get_final_category()
+                monthly_data[month_key][category] += abs(t.amount)
+        
+        sorted_months = sorted(monthly_data.keys())[-months:]
+        
+        result = {}
+        for month in sorted_months:
+            result[month] = dict(monthly_data[month])
+        
+        return result
+    
+    def get_category_breakdown(self, user_id: int, is_auto: bool = None) -> Dict:
+        """Детальная разбивка по категориям с фильтром по источнику"""
+        stats = {
+            'total_expenses': 0,
+            'total_transactions': 0,
+            'categories': {},
+            'average_per_transaction': 0
+        }
+        
+        query = self.db.query(Transaction).filter(
+            Transaction.user_id == user_id,
+            Transaction.amount < 0
+        )
+        
+        if is_auto is not None:
+            query = query.filter(Transaction.is_auto == is_auto)
+        
+        transactions = query.all()
+        
+        if not transactions:
+            return stats
+        
+        total_expenses = 0
+        category_data = defaultdict(lambda: {'total': 0, 'count': 0})
+        
+        for t in transactions:
+            category = t.get_final_category()
+            amount = abs(t.amount)
+            total_expenses += amount
+            category_data[category]['total'] += amount
+            category_data[category]['count'] += 1
+        
+        stats['total_expenses'] = total_expenses
+        stats['total_transactions'] = len(transactions)
+        stats['average_per_transaction'] = total_expenses / len(transactions) if transactions else 0
+        
+        for cat, data in category_data.items():
+            stats['categories'][cat] = {
+                'total': data['total'],
+                'count': data['count'],
+                'percentage': (data['total'] / total_expenses * 100) if total_expenses > 0 else 0
+            }
+        
+        return stats
+    
+    def get_top_merchants(self, user_id: int, limit: int = 10, is_auto: bool = None) -> List[Tuple[str, float, int]]:
+        """Топ магазинов по сумме трат с фильтром по источнику"""
+        query = self.db.query(Transaction).filter(
+            Transaction.user_id == user_id,
+            Transaction.amount < 0
+        )
+        
+        if is_auto is not None:
+            query = query.filter(Transaction.is_auto == is_auto)
+        
+        transactions = query.all()
+        
+        merchant_stats = defaultdict(lambda: {'total': 0, 'count': 0})
+        
+        for t in transactions:
+            if t.amount and t.amount < 0:
+                merchant = t.description.split()[0] if t.description else "unknown"
+                merchant_stats[merchant]['total'] += abs(t.amount)
+                merchant_stats[merchant]['count'] += 1
+        
+        sorted_merchants = sorted(
+            merchant_stats.items(),
+            key=lambda x: x[1]['total'],
+            reverse=True
+        )[:limit]
+        
+        return [(name, stats['total'], stats['count']) for name, stats in sorted_merchants]
