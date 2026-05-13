@@ -500,18 +500,46 @@
                 gap: 12px;
             }
         }
+        .logout-btn {
+    background: rgba(239, 68, 68, 0.9);
+    border: none;
+    color: white;
+    padding: 6px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.logout-btn:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+}
+
+.username {
+    color: #475569;
+    font-size: 14px;
+    font-weight: 500;
+    margin-left: 8px;
+    padding: 6px 12px;
+    background: #f1f5f9;
+    border-radius: 10px;
+}
     </style>
 </head>
 <body>
     <nav class="navbar">
-        <div class="logo">SmartSpend</div>
-        <div class="nav-links">
-            <a href="/app">Транзакции</a>
-            <a href="/dashboard">Аналитика</a>
-            <a href="/history">История</a>
-            <a href="/statements">Выписки</a>
-        </div>
-    </nav>
+    <div class="logo">SmartSpend</div>
+    <div class="nav-links">
+        <a href="/app">Транзакции</a>
+        <a href="/dashboard">Аналитика</a>
+        <a href="/history">История</a>
+        <a href="/statements">Выписки</a>
+        <span class="username">{{ user.username }}</span>
+        <button onclick="logout()" class="logout-btn">Выйти</button>
+    </div>
+</nav>
     
     <div class="container">
         <!-- Множественный ввод транзакций -->
@@ -634,7 +662,7 @@
         
         function renderUserTemplates() {
             const grid = document.getElementById('templatesGrid');
-            // Удаляем старые пользовательские шаблоны (оставляем только быстрые и кнопку добавления)
+            // Удаляем старые пользовательские шаблоны
             const allButtons = grid.querySelectorAll('.template-btn');
             for (const btn of allButtons) {
                 if (btn.classList.contains('user-template')) {
@@ -643,7 +671,7 @@
             }
             const addBtn = grid.querySelector('.add-template-btn');
             
-            // Добавляем пользовательские шаблоны перед кнопкой "+ Свой шаблон"
+            // Добавляем пользовательские шаблоны
             for (const t of userTemplates) {
                 const btn = document.createElement('button');
                 btn.className = 'template-btn user-template';
@@ -654,14 +682,11 @@
         }
         
         function applyTemplateToActive(name, amount) {
-            // Находим последнюю (активную) транзакцию или первую пустую
             const transactions = document.querySelectorAll('.transaction-item');
             let targetTransaction = transactions[transactions.length - 1];
             
-            // Проверяем, есть ли уже описание в последней транзакции
             const lastDesc = targetTransaction.querySelector('.trans-desc')?.value.trim();
             if (lastDesc) {
-                // Если последняя заполнена, создаём новую
                 addTransactionForm();
                 targetTransaction = document.querySelector('.transaction-item:last-child');
             }
@@ -672,7 +697,6 @@
             if (descField) descField.value = name;
             if (amountField) amountField.value = amount;
             
-            // Прокручиваем к полю описания
             descField?.focus();
         }
         
@@ -948,6 +972,11 @@
             } catch (error) { 
                 alert('Ошибка экспорта'); 
             } 
+        }
+        
+        // Функция выхода - для сессионной авторизации
+        function logout() {
+            window.location.href = '/logout';
         }
         
         loadStats();

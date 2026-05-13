@@ -1,28 +1,42 @@
 """
-FastAPI веб-приложение с БД (упрощённая версия без авторизации для теста)
+FastAPI веб-приложение с БД и сессионной авторизацией
 """
 
-from fastapi import FastAPI, Request, HTTPException, Depends, Form, BackgroundTasks, UploadFile, File
+from fastapi import FastAPI, Request, HTTPException, Depends, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 import time
 import pandas as pd
 from io import StringIO, BytesIO
 from collections import defaultdict
+import threading
+import os
+import hashlib
+import secrets
 
-from database import TrainingFeedback, Transaction, create_tables, get_db, TransactionRepository
+from database import TrainingFeedback, Transaction, User, UploadedFile, create_tables, get_db, TransactionRepository
 from ml_service import EnhancedExpenseClassifier
 from analytics import AnalyticsService
 
 # Создание приложения
 app = FastAPI(
-    title="Expense Categorizer API",
+    title="SmartSpend API",
     description="Автоматическая категоризация банковских транзакций",
     version="3.0.0"
+)
+
+# Добавляем middleware для сессий (ВАЖНО: до CORS)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key="smartspend-session-secret-key-2024-change-in-production",
+    session_cookie="smartspend_session",
+    max_age=60*60*24*7,  # 7 дней
+    same_site="lax"
 )
 
 # CORS
@@ -44,25 +58,123 @@ ml_service = EnhancedExpenseClassifier()
 create_tables()
 
 
+# ============= Вспомогательные функции для работы с паролями =============
+
+def hash_password(password: str) -> str:
+    """Хеширование пароля с солью"""
+    salt = secrets.token_hex(16)
+    hash_obj = hashlib.sha256((password + salt).encode())
+    return f"{salt}:{hash_obj.hexdigest()}"
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Проверка пароля"""
+    try:
+        salt, hash_value = hashed_password.split(":")
+        new_hash = hashlib.sha256((plain_password + salt).encode()).hexdigest()
+        return new_hash == hash_value
+    except:
+        return False
+
+
+# ============= Зависимость для получения текущего пользователя из сессии =============
+
+async def get_current_user(request: Request, db: Session = Depends(get_db)):
+    """Получение текущего пользователя из сессии"""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=403, detail="Not authenticated")
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=403, detail="User not found")
+    return user
+
+
 # ============= Загрузка модели =============
+
+def auto_retrain_if_needed(db: Session):
+    """Автоматическое дообучение модели"""
+    from database import SessionLocal
+    new_db = SessionLocal()
+    try:
+        pending_feedback = new_db.query(TrainingFeedback).filter(
+            TrainingFeedback.used_for_training == False
+        ).order_by(TrainingFeedback.created_at.desc()).first()
+        
+        if pending_feedback is None:
+            return False
+        
+        print(f"\n🔄 Обнаружено новое исправление: '{pending_feedback.description}' → {pending_feedback.correct_category}")
+        
+        all_pending = new_db.query(TrainingFeedback).filter(
+            TrainingFeedback.used_for_training == False
+        ).all()
+        
+        train_data = []
+        
+        for f in all_pending:
+            for _ in range(10):
+                train_data.append({
+                    'description': f.description,
+                    'category': f.correct_category,
+                    'amount': f.amount
+                })
+        
+        old_feedbacks = new_db.query(TrainingFeedback).filter(
+            TrainingFeedback.used_for_training == True
+        ).order_by(TrainingFeedback.created_at.desc()).limit(200).all()
+        
+        for f in old_feedbacks:
+            for _ in range(3):
+                train_data.append({
+                    'description': f.description,
+                    'category': f.correct_category,
+                    'amount': f.amount
+                })
+        
+        print("   Добавление базовых синтетических данных...")
+        synthetic_df = ml_service._generate_enhanced_data(100)
+        for _, row in synthetic_df.iterrows():
+            train_data.append({
+                'description': row['description'],
+                'category': row['category'],
+                'amount': row['amount']
+            })
+        
+        print(f"   Всего примеров для обучения: {len(train_data)}")
+        
+        df = pd.DataFrame(train_data)
+        ml_service.train(df=df, use_synthetic=False)
+        ml_service.save_model('enhanced_model.pkl')
+        
+        ml_service.cache = {}
+        print("   Кэш модели очищен")
+        
+        for f in all_pending:
+            feedback = new_db.query(TrainingFeedback).filter(TrainingFeedback.id == f.id).first()
+            if feedback:
+                feedback.used_for_training = True
+        new_db.commit()
+        
+        print(f"✅ Модель дообучена! Теперь '{pending_feedback.description}' → '{pending_feedback.correct_category}'")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Ошибка дообучения: {e}")
+        new_db.rollback()
+        return False
+    finally:
+        new_db.close()
+
 
 @app.on_event("startup")
 async def startup_event():
-    """Загрузка модели при запуске с авто-дообучением"""
-    import os
+    """Загрузка модели при запуске"""
     print("Загрузка ML модели...")
     
     if os.path.exists('enhanced_model.pkl'):
         ml_service.load_model('enhanced_model.pkl')
         print("Модель загружена из файла")
-        
-        # Проверяем наличие неиспользованных исправлений
-        from database import SessionLocal
-        db = SessionLocal()
-        try:
-            auto_retrain_if_needed(db)
-        finally:
-            db.close()
     else:
         metrics = ml_service.train(use_synthetic=True)
         ml_service.save_model('enhanced_model.pkl')
@@ -72,52 +184,194 @@ async def startup_event():
 # ============= Веб-страницы =============
 
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    """Главная страница (лендинг)"""
+async def landing(request: Request):
+    """Лендинг страница"""
+    # Если уже авторизован - перенаправляем в приложение
+    if request.session.get("user_id"):
+        return RedirectResponse(url="/app", status_code=303)
     return templates.TemplateResponse("landing.html", {"request": request})
 
 
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    """Страница входа и регистрации"""
+    # ЕСЛИ УЖЕ АВТОРИЗОВАН - ПЕРЕНАПРАВЛЯЕМ НА /app
+    if request.session.get("user_id"):
+        return RedirectResponse(url="/app", status_code=303)
+    return templates.TemplateResponse("login.html", {"request": request})
+
+
+# Добавьте эти print в функции
+
+@app.post("/login")
+async def login(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    print(f"🔐 Попытка входа: username={username}")
+    
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        print(f"❌ Пользователь {username} не найден в БД")
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Неверный логин или пароль"
+        })
+    
+    print(f"✅ Пользователь найден: {user.username}, id={user.id}")
+    
+    if not verify_password(password, user.hashed_password):
+        print(f"❌ Неверный пароль для {username}")
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Неверный логин или пароль"
+        })
+    
+    # Сохраняем пользователя в сессии
+    request.session["user_id"] = user.id
+    request.session["username"] = user.username
+    
+    print(f"✅ Сессия сохранена: user_id={user.id}")
+    print(f"   Session data: {dict(request.session)}")
+    
+    return RedirectResponse(url="/app", status_code=303)
+
+
+async def get_current_user(request: Request, db: Session = Depends(get_db)):
+    """Получение текущего пользователя из сессии"""
+    print(f"🔍 get_current_user вызван")
+    print(f"   Cookie: {request.headers.get('cookie', 'Нет cookie')}")
+    
+    user_id = request.session.get("user_id")
+    print(f"   user_id из сессии: {user_id}")
+    
+    if not user_id:
+        print("❌ Нет user_id в сессии")
+        raise HTTPException(status_code=403, detail="Not authenticated")
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        print(f"❌ Пользователь с id={user_id} не найден в БД")
+        raise HTTPException(status_code=403, detail="User not found")
+    
+    print(f"✅ Текущий пользователь: {user.username}")
+    return user
+
+
+@app.post("/register")
+async def register(
+    request: Request,
+    email: str = Form(...),
+    username: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Обработка регистрации"""
+    # Проверка существующего пользователя
+    if db.query(User).filter(User.username == username).first():
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Имя пользователя уже занято"
+        })
+    
+    if db.query(User).filter(User.email == email).first():
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Email уже зарегистрирован"
+        })
+    
+    if len(password) < 4:
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Пароль должен быть не менее 4 символов"
+        })
+    
+    # Создаём пользователя
+    user = User(
+        email=email,
+        username=username,
+        hashed_password=hash_password(password)
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    # Автоматически входим после регистрации
+    request.session["user_id"] = user.id
+    request.session["username"] = user.username
+    
+    return RedirectResponse(url="/app", status_code=303)
+
+
+@app.get("/logout")
+async def logout(request: Request):
+    """Выход из системы - полная очистка сессии"""
+    # Очищаем всю сессию
+    request.session.clear()
+    # Создаём редирект на лендинг
+    response = RedirectResponse(url="/", status_code=303)
+    # Удаляем cookie с сессией на клиенте
+    response.delete_cookie("smartspend_session")
+    return response
+
+
 @app.get("/app", response_class=HTMLResponse)
-async def app_main(request: Request):
-    """Главное приложение"""
+async def app_main(request: Request, current_user: User = Depends(get_current_user)):
+    """Главное приложение (требует авторизацию)"""
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "categories": ml_service.categories
+        "categories": ml_service.categories,
+        "user": current_user
     })
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request):
+async def dashboard(request: Request, current_user: User = Depends(get_current_user)):
     """Дашборд аналитики"""
     return templates.TemplateResponse("dashboard.html", {
-        "request": request
+        "request": request,
+        "user": current_user
     })
 
 
 @app.get("/history", response_class=HTMLResponse)
-async def history(request: Request):
+async def history(request: Request, current_user: User = Depends(get_current_user)):
     """История транзакций"""
     return templates.TemplateResponse("history.html", {
-        "request": request
+        "request": request,
+        "user": current_user
     })
 
 
-# ============= API эндпоинты (без авторизации) =============
+@app.get("/statements", response_class=HTMLResponse)
+async def statements_page(request: Request, current_user: User = Depends(get_current_user)):
+    """Страница управления выписками"""
+    return templates.TemplateResponse("statements.html", {
+        "request": request,
+        "user": current_user
+    })
+
+
+# ============= API эндпоинты (с авторизацией через сессию) =============
 
 @app.post("/api/predict")
 async def predict_transaction(
+    request: Request,
     description: str = Form(...),
     amount: Optional[float] = Form(None),
     date: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    """Предсказание и сохранение транзакции (ручной ввод)"""
+    """Предсказание и сохранение транзакции"""
     start_time = time.time()
     
     category, confidence = ml_service.predict(description, amount)
     processing_time = (time.time() - start_time) * 1000
     
-    # Обработка даты
     transaction_date = datetime.now()
     if date:
         try:
@@ -126,7 +380,7 @@ async def predict_transaction(
             pass
     
     transaction = Transaction(
-        user_id=1,
+        user_id=current_user.id,
         description=description,
         amount=amount,
         predicted_category=category,
@@ -149,125 +403,90 @@ async def predict_transaction(
         "date": transaction_date.strftime('%Y-%m-%d')
     }
 
+
 @app.post("/api/upload-bank-statement")
 async def upload_bank_statement(
+    request: Request,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    """
-    Загрузка банковской выписки (CSV или Excel)
-    Поддерживаются форматы: Сбер, Т-Банк, Альфа, ВТБ
-    """
+    """Загрузка банковской выписки"""
     import chardet
     import csv
-    from database import UploadedFile
     
     contents = await file.read()
     
-    # Определяем тип файла
     if file.filename.endswith('.csv'):
-        # Пробуем определить кодировку
         detected = chardet.detect(contents)
         encoding = detected['encoding'] if detected['encoding'] else 'utf-8'
         
-        # Пробуем разные разделители
         separators = [',', ';', '\t', '|']
         df = None
         
-        # Сначала пробуем прочитать как обычный CSV с автоопределением
         for sep in separators:
             try:
                 text = contents.decode(encoding, errors='ignore')
-                from io import StringIO
                 df = pd.read_csv(StringIO(text), sep=sep, encoding=encoding, 
                                 on_bad_lines='skip', engine='python')
                 if len(df.columns) > 1:
-                    print(f"Успешно прочитан CSV с разделителем '{sep}' и кодировкой {encoding}")
                     break
             except:
                 continue
         
-        # Если не получилось, пробуем через стандартный csv модуль
         if df is None or len(df.columns) <= 1:
             try:
                 text = contents.decode(encoding, errors='ignore')
                 lines = text.split('\n')
                 dialect = csv.Sniffer().sniff(lines[0])
-                from io import StringIO
                 df = pd.read_csv(StringIO(text), dialect=dialect, on_bad_lines='skip')
-                print(f"Успешно определён диалект CSV: {dialect.delimiter}")
             except:
                 pass
         
-        # Если всё ещё нет, пробуем без заголовка
-        if df is None or len(df.columns) <= 1:
-            for sep in separators:
-                try:
-                    text = contents.decode(encoding, errors='ignore')
-                    from io import StringIO
-                    df = pd.read_csv(StringIO(text), sep=sep, header=None, on_bad_lines='skip')
-                    if len(df.columns) > 1:
-                        df.columns = df.iloc[0]
-                        df = df[1:]
-                        break
-                except:
-                    continue
-        
         if df is None or df.empty:
-            raise HTTPException(status_code=400, detail="Не удалось прочитать CSV файл. Проверьте формат.")
+            raise HTTPException(status_code=400, detail="Не удалось прочитать CSV файл")
     
     elif file.filename.endswith(('.xlsx', '.xls')):
         df = pd.read_excel(BytesIO(contents))
     else:
-        raise HTTPException(status_code=400, detail="Неподдерживаемый формат файла. Используйте CSV или Excel.")
+        raise HTTPException(status_code=400, detail="Неподдерживаемый формат файла")
     
     if df.empty:
         raise HTTPException(status_code=400, detail="Файл пуст")
     
-    # Приводим колонки к нижнему регистру для поиска
     df.columns = [str(col).lower().strip() for col in df.columns]
     
-    # Автоопределение колонок
     description_col = None
     amount_col = None
     date_col = None
     
-    # Ищем колонку с описанием
-    description_keywords = ['описание', 'назначение', 'description', 'наименование', 'comment', 'название', 'detail']
     for col in df.columns:
-        if any(keyword in col for keyword in description_keywords):
+        if any(word in col for word in ['описание', 'назначение', 'description', 'наименование', 'comment', 'название']):
             description_col = col
             break
     
-    # Если не нашли, берём первую текстовую колонку
     if description_col is None:
         for col in df.columns:
             if df[col].dtype == 'object':
                 description_col = col
                 break
     
-    # Ищем колонку с суммой
-    amount_keywords = ['сумма операции', 'сумма', 'amount', 'списано', 'зачислено']
     for col in df.columns:
-        if any(keyword in col for keyword in amount_keywords):
+        if any(word in col for word in ['сумма операции', 'сумма', 'amount', 'списано', 'зачислено']):
             amount_col = col
             break
     
-    # Если не нашли, берём числовую колонку
     if amount_col is None:
         for col in df.columns:
             if df[col].dtype in ['float64', 'int64']:
                 amount_col = col
                 break
     
-    # Ищем колонку с датой
-    date_keywords = ['дата операции', 'дата', 'date', 'datetime']
     for col in df.columns:
-        if any(keyword in col for keyword in date_keywords):
+        if any(word in col for word in ['дата операции', 'дата', 'date', 'datetime']):
             date_col = col
             break
     
-    # Обработка транзакций
     processed = 0
     total_expenses = 0
     total_income = 0
@@ -276,7 +495,6 @@ async def upload_bank_statement(
     
     for idx, row in df.iterrows():
         try:
-            # Получаем описание
             description = ""
             if description_col and pd.notna(row[description_col]):
                 description = str(row[description_col]).strip()
@@ -284,13 +502,10 @@ async def upload_bank_statement(
             if not description or len(description) < 2:
                 continue
             
-            # Пропускаем технические строки
-            skip_words = ['баланс', 'остаток', 'выписка', 'начало', 'конец', 'итого', 'всего', 
-                         'page', 'total', 'balance', 'остаток на', 'начальный остаток']
+            skip_words = ['баланс', 'остаток', 'выписка', 'начало', 'конец', 'итого', 'total', 'balance']
             if any(word in description.lower() for word in skip_words):
                 continue
             
-            # Получаем сумму (НЕ МЕНЯЕМ ЗНАК)
             amount = None
             if amount_col and pd.notna(row[amount_col]):
                 try:
@@ -298,7 +513,6 @@ async def upload_bank_statement(
                 except:
                     amount = None
             
-            # Получаем дату из выписки
             transaction_date = datetime.now()
             if date_col and pd.notna(row[date_col]):
                 try:
@@ -306,12 +520,10 @@ async def upload_bank_statement(
                 except:
                     pass
             
-            # Предсказываем категорию
             category, confidence = ml_service.predict(description, amount)
             
-            # Сохраняем в БД
             transaction = Transaction(
-                user_id=1,
+                user_id=current_user.id,
                 description=description[:500],
                 amount=amount,
                 predicted_category=category,
@@ -343,11 +555,10 @@ async def upload_bank_statement(
             content={"detail": f"Не удалось обработать ни одной транзакции. Ошибки: {errors[:3]}"}
         )
     
-    # Сохраняем информацию о загруженном файле
     uploaded_file = UploadedFile(
-        user_id=1,
+        user_id=current_user.id,
         filename=file.filename,
-        upload_date=datetime.now(),  # Текущая дата и время загрузки
+        upload_date=datetime.now(),
         transactions_count=processed,
         total_amount=total_expenses
     )
@@ -367,14 +578,15 @@ async def upload_bank_statement(
 
 @app.get("/api/transactions")
 async def get_transactions(
+    request: Request,
     limit: int = 50,
     offset: int = 0,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    """Получение истории транзакций (только ручной ввод)"""
+    """Получение истории транзакций"""
     repo = TransactionRepository(db)
-    # Фильтруем только ручные транзакции (is_auto=True)
-    transactions = repo.get_user_transactions_by_source(1, limit, offset, is_auto=True)
+    transactions = repo.get_user_transactions_by_source(current_user.id, limit, offset, is_auto=True)
     return [t.to_dict() for t in transactions]
 
 
@@ -382,18 +594,16 @@ async def get_transactions(
 async def update_transaction_category(
     transaction_id: int,
     category: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    """Ручная коррекция категории с мгновенным дообучением"""
+    """Ручная коррекция категории"""
     repo = TransactionRepository(db)
-    transaction = repo.update_category(transaction_id, 1, category)
+    transaction = repo.update_category(transaction_id, current_user.id, category)
     
     if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found")
     
-    # Запускаем дообучение в отдельном потоке с НОВОЙ сессией
-    import threading
-    # Передаём копию данных, а не сессию
     threading.Thread(target=auto_retrain_if_needed, args=(db,)).start()
     
     return {"success": True, "transaction": transaction.to_dict()}
@@ -402,23 +612,29 @@ async def update_transaction_category(
 @app.delete("/api/transactions/{transaction_id}")
 async def delete_transaction(
     transaction_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Удаление транзакции"""
     repo = TransactionRepository(db)
-    success = repo.delete_transaction(transaction_id, 1)
+    success = repo.delete_transaction(transaction_id, current_user.id)
     
     if not success:
         raise HTTPException(status_code=404, detail="Transaction not found")
     
     return {"success": True}
 
+
 @app.get("/api/transactions/clear-all")
-async def clear_all_transactions_get(db: Session = Depends(get_db)):
-    """Очистка всех транзакций (GET метод)"""
+async def clear_all_transactions_get(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Очистка всех транзакций пользователя"""
     from sqlalchemy import text
     
-    result = db.execute(text("DELETE FROM transactions WHERE user_id = 1"))
+    result = db.execute(text(f"DELETE FROM transactions WHERE user_id = {current_user.id}"))
     db.commit()
     
     return {
@@ -427,188 +643,136 @@ async def clear_all_transactions_get(db: Session = Depends(get_db)):
         "message": f"Удалено {result.rowcount} транзакций"
     }
 
+
 @app.get("/api/stats")
-async def get_stats(db: Session = Depends(get_db)):
-    """Статистика только для ручного ввода (is_auto=True)"""
+async def get_stats(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Статистика транзакций"""
     repo = TransactionRepository(db)
-    return repo.get_statistics_by_source(1, is_auto=True)
+    return repo.get_statistics_by_source(current_user.id, is_auto=True)
 
 
 @app.get("/api/analytics/categories")
 async def get_category_stats(
     days: int = 30,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Статистика по категориям"""
     analytics = AnalyticsService(db)
-    return analytics.get_expenses_by_category(1, days)
+    return analytics.get_expenses_by_category(current_user.id, days)
 
 
 @app.get("/api/analytics/monthly")
 async def get_monthly_trend(
     months: int = 6,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Динамика по месяцам"""
     analytics = AnalyticsService(db)
-    return analytics.get_monthly_trend(1, months)
+    return analytics.get_monthly_trend(current_user.id, months)
 
 
 @app.get("/api/analytics/top-merchants")
 async def get_top_merchants(
     limit: int = 10,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Топ магазинов"""
     analytics = AnalyticsService(db)
-    merchants = analytics.get_top_merchants(1, limit)
+    merchants = analytics.get_top_merchants(current_user.id, limit)
     return [{"name": m[0], "total": m[1], "count": m[2]} for m in merchants]
 
 
 @app.get("/api/analytics/breakdown")
-async def get_breakdown(db: Session = Depends(get_db)):
+async def get_breakdown(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Полная разбивка расходов"""
     analytics = AnalyticsService(db)
-    return analytics.get_category_breakdown(1)
+    return analytics.get_category_breakdown(current_user.id)
 
 
 @app.get("/api/analytics/daily")
 async def get_daily_spending(
     days: int = 30,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Ежедневные расходы"""
     analytics = AnalyticsService(db)
-    return analytics.get_daily_spending(1, days)
+    return analytics.get_daily_spending(current_user.id, days)
+
 
 @app.get("/api/analytics/manual")
-async def get_manual_analytics(db: Session = Depends(get_db)):
-    """Аналитика только для ручного ввода (is_auto = True)"""
+async def get_manual_analytics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Аналитика для ручного ввода"""
     analytics = AnalyticsService(db)
-    return analytics.get_analytics_by_source(1, is_auto=True)
+    return analytics.get_analytics_by_source(current_user.id, is_auto=True)
+
 
 @app.get("/api/analytics/bank")
-async def get_bank_analytics(db: Session = Depends(get_db)):
-    """Аналитика только для выписок (is_auto = False)"""
+async def get_bank_analytics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Аналитика для выписок"""
     analytics = AnalyticsService(db)
-    return analytics.get_analytics_by_source(1, is_auto=False)
+    return analytics.get_analytics_by_source(current_user.id, is_auto=False)
 
-
-@app.get("/api/export/csv")
-async def export_csv(days: int = 90, db: Session = Depends(get_db)):
-    """Экспорт транзакций в CSV"""
-    analytics = AnalyticsService(db)
-    df = analytics.get_export_data(1, days)
-    
-    stream = StringIO()
-    df.to_csv(stream, index=False, encoding='utf-8-sig')
-    response = StreamingResponse(
-        iter([stream.getvalue()]),
-        media_type="text/csv"
-    )
-    response.headers["Content-Disposition"] = "attachment; filename=transactions.csv"
-    return response
-
-
-@app.get("/api/export/excel")
-async def export_excel(days: int = 90, db: Session = Depends(get_db)):
-    """Экспорт транзакций в Excel"""
-    analytics = AnalyticsService(db)
-    df = analytics.get_export_data(1, days)
-    
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, sheet_name='Транзакции', index=False)
-    output.seek(0)
-    
-    response = StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    response.headers["Content-Disposition"] = "attachment; filename=transactions.xlsx"
-    return response
-
-@app.post("/api/retrain")
-async def retrain_model_manual(db: Session = Depends(get_db)):
-    """Ручной запуск дообучения"""
-    success = auto_retrain_if_needed(db)
-    
-    if success:
-        return {
-            "success": True,
-            "message": "Модель успешно дообучена"
-        }
-    else:
-        pending = db.query(TrainingFeedback).filter(
-            TrainingFeedback.used_for_training == False
-        ).count()
-        return {
-            "success": False,
-            "message": f"Недостаточно исправлений. Нужно минимум 5, есть {pending}",
-            "pending_count": pending
-        }
-    
-
-@app.get("/api/statements")
-async def get_statements_list(db: Session = Depends(get_db)):
-    """Список загруженных выписок"""
-    from database import UploadedFile
-    
-    files = db.query(UploadedFile).filter(
-        UploadedFile.user_id == 1
-    ).order_by(UploadedFile.upload_date.desc()).all()
-    
-    statements = []
-    for f in files:
-        statements.append({
-            'filename': f.filename,
-            'upload_date': f.upload_date.strftime('%Y-%m-%d %H:%M:%S'),
-            'transactions_count': f.transactions_count,
-            'total_amount': f.total_amount
-        })
-    
-    return {"statements": statements}
-
-
-@app.get("/statements", response_class=HTMLResponse)
-async def statements_page(request: Request):
-    """Страница управления выписками"""
-    return templates.TemplateResponse("statements.html", {"request": request})
 
 @app.get("/api/analytics/manual/weekly")
-async def get_manual_weekly_spending(db: Session = Depends(get_db)):
-    """Расходы по дням недели (ручной ввод)"""
+async def get_manual_weekly_spending(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Расходы по дням недели"""
     analytics = AnalyticsService(db)
-    return analytics.get_weekly_spending(1, is_auto=True)
+    return analytics.get_weekly_spending(current_user.id, is_auto=True)
+
 
 @app.get("/api/analytics/manual/predict")
-async def get_manual_predict(db: Session = Depends(get_db)):
-    """Прогноз расходов (ручной ввод)"""
+async def get_manual_predict(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Прогноз расходов"""
     analytics = AnalyticsService(db)
-    return analytics.predict_next_month_expenses(1, is_auto=True)
+    return analytics.predict_next_month_expenses(current_user.id, is_auto=True)
+
 
 @app.get("/api/analytics/bank/predict")
-async def get_bank_predict(db: Session = Depends(get_db)):
-    """Прогноз расходов (выписки)"""
+async def get_bank_predict(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Прогноз расходов для выписок"""
     analytics = AnalyticsService(db)
-    return analytics.predict_next_month_expenses(1, is_auto=False)
+    return analytics.predict_next_month_expenses(current_user.id, is_auto=False)
+
 
 @app.get("/api/analytics/insights")
 async def get_insights(
     db: Session = Depends(get_db),
-    source: str = "manual"
+    source: str = "manual",
+    current_user: User = Depends(get_current_user)
 ):
-    """
-    Анализ расходов и персональные рекомендации
-    """
+    """Анализ расходов и рекомендации"""
     analytics = AnalyticsService(db)
     
-    # Определяем источник данных
     is_auto = True if source == "manual" else False
     
-    # Проверяем, есть ли данные для выписок
     if source == "bank":
-        bank_stats = analytics.get_analytics_by_source(1, is_auto=False)
+        bank_stats = analytics.get_analytics_by_source(current_user.id, is_auto=False)
         if bank_stats.get('total_transactions', 0) == 0:
             return {
                 "insights": [],
@@ -618,17 +782,12 @@ async def get_insights(
                 "message": "Нет загруженных выписок"
             }
     
-    # Получаем данные с учётом источника
-    breakdown = analytics.get_category_breakdown(1, is_auto=is_auto)
-    monthly = analytics.get_monthly_trend(1, 3, is_auto=is_auto)
-    top_merchants = analytics.get_top_merchants(1, 10, is_auto=is_auto)
-    weekly = analytics.get_weekly_spending(1, is_auto=is_auto)
+    breakdown = analytics.get_category_breakdown(current_user.id, is_auto=is_auto)
+    total_expenses = breakdown.get('total_expenses', 0)
+    categories = breakdown.get('categories', {})
+    top_merchants = analytics.get_top_merchants(current_user.id, 10, is_auto=is_auto)
     
     insights = []
-    
-    # 1. Анализ по категориям
-    categories = breakdown.get('categories', {})
-    total_expenses = breakdown.get('total_expenses', 0)
     
     norms = {
         'Кафе': 5000, 'Такси': 3000, 'Каршеринг': 2000,
@@ -648,7 +807,6 @@ async def get_insights(
                 "suggestion": f"Рекомендуем сократить расходы на {int(excess * 0.3)}-{int(excess * 0.5)} ₽"
             })
     
-    # 2. Анализ частых покупок
     for merchant, total, count in top_merchants[:3]:
         if total > 3000:
             insights.append({
@@ -658,7 +816,6 @@ async def get_insights(
                 "suggestion": "Попробуйте поискать альтернативы или покупать по акциям"
             })
     
-    # 3. Анализ кафе
     cafe_spent = categories.get('Кафе', {}).get('total', 0)
     if cafe_spent > 3000:
         savings = cafe_spent * 0.4
@@ -669,7 +826,6 @@ async def get_insights(
             "suggestion": f"Готовьте обед дома — можно сэкономить до {savings:.0f} ₽!"
         })
     
-    # 4. Анализ транспорта
     taxi_spent = categories.get('Такси', {}).get('total', 0)
     carsharing_spent = categories.get('Каршеринг', {}).get('total', 0)
     transport_spent = taxi_spent + carsharing_spent
@@ -683,7 +839,6 @@ async def get_insights(
             "suggestion": f"Используйте общественный транспорт — экономия до {savings:.0f} ₽!"
         })
     
-    # 5. Анализ подписок
     subscriptions_spent = categories.get('Подписки', {}).get('total', 0)
     if subscriptions_spent > 500:
         insights.append({
@@ -693,7 +848,6 @@ async def get_insights(
             "suggestion": "Откажитесь от неиспользуемых подписок — экономия до 30%"
         })
     
-    # 6. Общая рекомендация
     if total_expenses > 30000:
         savings_potential = total_expenses * 0.15
         insights.append({
@@ -710,7 +864,6 @@ async def get_insights(
             "suggestion": "Продолжайте в том же духе!"
         })
     
-    # 7. Основная статья расходов
     if categories:
         top_category = max(categories.items(), key=lambda x: x[1]['total'])
         if top_category[1]['total'] > total_expenses * 0.4:
@@ -729,89 +882,105 @@ async def get_insights(
     }
 
 
-def auto_retrain_if_needed(db: Session):
-    """Автоматическое дообучение после КАЖДОГО исправления"""
-    from database import SessionLocal
+@app.get("/api/export/csv")
+async def export_csv(
+    days: int = 90,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Экспорт транзакций в CSV"""
+    analytics = AnalyticsService(db)
+    df = analytics.get_export_data(current_user.id, days)
     
-    # Получаем последнее неиспользованное исправление (используем НОВУЮ сессию)
-    new_db = SessionLocal()
-    try:
-        pending_feedback = new_db.query(TrainingFeedback).filter(
+    stream = StringIO()
+    df.to_csv(stream, index=False, encoding='utf-8-sig')
+    response = StreamingResponse(
+        iter([stream.getvalue()]),
+        media_type="text/csv"
+    )
+    response.headers["Content-Disposition"] = "attachment; filename=transactions.csv"
+    return response
+
+
+@app.get("/api/export/excel")
+async def export_excel(
+    days: int = 90,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Экспорт транзакций в Excel"""
+    analytics = AnalyticsService(db)
+    df = analytics.get_export_data(current_user.id, days)
+    
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='Транзакции', index=False)
+    output.seek(0)
+    
+    response = StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response.headers["Content-Disposition"] = "attachment; filename=transactions.xlsx"
+    return response
+
+
+@app.get("/api/statements")
+async def get_statements_list(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Список загруженных выписок"""
+    files = db.query(UploadedFile).filter(
+        UploadedFile.user_id == current_user.id
+    ).order_by(UploadedFile.upload_date.desc()).all()
+    
+    statements = []
+    for f in files:
+        statements.append({
+            'filename': f.filename,
+            'upload_date': f.upload_date.strftime('%Y-%m-%d %H:%M:%S'),
+            'transactions_count': f.transactions_count,
+            'total_amount': f.total_amount
+        })
+    
+    return {"statements": statements}
+
+
+@app.post("/api/retrain")
+async def retrain_model_manual(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Ручной запуск дообучения"""
+    success = auto_retrain_if_needed(db)
+    
+    if success:
+        return {
+            "success": True,
+            "message": "Модель успешно дообучена"
+        }
+    else:
+        pending = db.query(TrainingFeedback).filter(
             TrainingFeedback.used_for_training == False
-        ).order_by(TrainingFeedback.created_at.desc()).first()
-        
-        if pending_feedback is None:
-            return False
-        
-        print(f"\n🔄 Обнаружено новое исправление: '{pending_feedback.description}' → {pending_feedback.correct_category}")
-        
-        # Получаем ВСЕ неиспользованные исправления
-        all_pending = new_db.query(TrainingFeedback).filter(
-            TrainingFeedback.used_for_training == False
-        ).all()
-        
-        # Собираем данные для обучения
-        train_data = []
-        
-        # Добавляем исправления с высоким весом (10 копий)
-        for f in all_pending:
-            for _ in range(10):
-                train_data.append({
-                    'description': f.description,
-                    'category': f.correct_category,
-                    'amount': f.amount
-                })
-        
-        # Добавляем историю исправлений
-        old_feedbacks = new_db.query(TrainingFeedback).filter(
-            TrainingFeedback.used_for_training == True
-        ).order_by(TrainingFeedback.created_at.desc()).limit(200).all()
-        
-        for f in old_feedbacks:
-            for _ in range(3):
-                train_data.append({
-                    'description': f.description,
-                    'category': f.correct_category,
-                    'amount': f.amount
-                })
-        
-        # Добавляем минимум синтетических данных
-        print("   Добавление базовых синтетических данных...")
-        synthetic_df = ml_service._generate_enhanced_data(100)
-        for _, row in synthetic_df.iterrows():
-            train_data.append({
-                'description': row['description'],
-                'category': row['category'],
-                'amount': row['amount']
-            })
-        
-        print(f"   Всего примеров для обучения: {len(train_data)}")
-        
-        # Дообучаем модель
-        df = pd.DataFrame(train_data)
-        ml_service.train(df=df, use_synthetic=False)
-        ml_service.save_model('enhanced_model.pkl')
-        
-        # Очищаем кэш модели
-        ml_service.cache = {}
-        print("   Кэш модели очищен")
-        
-        # Отмечаем все неиспользованные исправления как использованные
-        for f in all_pending:
-            feedback = new_db.query(TrainingFeedback).filter(TrainingFeedback.id == f.id).first()
-            if feedback:
-                feedback.used_for_training = True
-        new_db.commit()
-        
-        print(f"✅ Модель дообучена! Теперь '{pending_feedback.description}' → '{pending_feedback.correct_category}'")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Ошибка дообучения: {e}")
-        new_db.rollback()
-        return False
-    finally:
-        new_db.close()
+        ).count()
+        return {
+            "success": False,
+            "message": f"Недостаточно исправлений. Нужно минимум 5, есть {pending}",
+            "pending_count": pending
+        }
+
+
+@app.get("/api/auth/me")
+async def get_me(current_user: User = Depends(get_current_user)):
+    """Информация о текущем пользователе"""
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "created_at": current_user.created_at.isoformat()
+    }
+
 
 if __name__ == "__main__":
     import uvicorn
