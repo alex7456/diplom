@@ -548,32 +548,38 @@
                 </div>
             </div>
             
-            <div class="charts-grid">
-                <div class="chart-card">
-                    <h3>Расходы по категориям</h3>
-                    <div class="chart-container">
-                        <canvas id="bankCategoryChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <h3>Топ магазинов</h3>
-                    <div class="chart-container">
-                        <canvas id="bankMerchantChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <h3>Ежедневные расходы</h3>
-                    <div class="chart-container">
-                        <canvas id="bankDailyChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-card">
-                    <h3>Топ категорий расходов</h3>
-                    <div class="chart-container">
-                        <canvas id="bankTopCategoriesChart"></canvas>
-                    </div>
-                </div>
-            </div>
+           <div class="charts-grid">
+    <div class="chart-card">
+        <h3>Расходы по категориям</h3>
+        <div class="chart-container">
+            <canvas id="bankCategoryChart"></canvas>
+        </div>
+    </div>
+    <div class="chart-card">
+        <h3>Топ магазинов</h3>
+        <div class="chart-container">
+            <canvas id="bankMerchantChart"></canvas>
+        </div>
+    </div>
+    <div class="chart-card">
+        <h3>Ежедневные расходы</h3>
+        <div class="chart-container">
+            <canvas id="bankDailyChart"></canvas>
+        </div>
+    </div>
+    <div class="chart-card">
+        <h3>Расходы по дням недели</h3>
+        <div class="chart-container">
+            <canvas id="bankWeeklyChart"></canvas>
+        </div>
+    </div>
+    <div class="chart-card">
+        <h3>Топ категорий расходов</h3>
+        <div class="chart-container">
+            <canvas id="bankTopCategoriesChart"></canvas>
+        </div>
+    </div>
+</div>
             
             <div class="info-note">
                 Данные отображаются только из загруженных выписок.
@@ -583,7 +589,7 @@
     
     <script>
         let manualCategoryChart, manualMerchantChart, manualTopCategoriesChart, manualWeeklyChart;
-        let bankCategoryChart, bankMerchantChart, bankDailyChart, bankTopCategoriesChart;
+        let bankCategoryChart, bankMerchantChart, bankDailyChart, bankWeeklyChart, bankTopCategoriesChart;
         
         const categoryColors = {
             'Продукты': '#22c55e', 'Транспорт': '#3b82f6', 'Кафе': '#f97316',
@@ -857,6 +863,30 @@
                         options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true } } }
                     });
                 }
+                // Расходы по дням недели для выписок
+const weeklyResponse = await fetch('/api/analytics/bank/weekly');
+const weeklyData = await weeklyResponse.json();
+
+const weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+const weeklyValues = weekdays.map(day => weeklyData[day] || 0);
+
+if (bankWeeklyChart) bankWeeklyChart.destroy();
+bankWeeklyChart = new Chart(document.getElementById('bankWeeklyChart'), {
+    type: 'bar',
+    data: {
+        labels: weekdays,
+        datasets: [{
+            label: 'Расходы (₽)',
+            data: weeklyValues,
+            backgroundColor: '#8b5cf6'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true } }
+    }
+});
                 
             } catch (error) {
                 console.error('Error loading bank analytics:', error);
