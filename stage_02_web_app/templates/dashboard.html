@@ -48,6 +48,7 @@
             display: flex;
             gap: 8px;
             align-items: center;
+            flex-wrap: wrap;
         }
         
         .nav-links a {
@@ -99,6 +100,9 @@
             gap: 8px;
             margin-bottom: 24px;
             border-bottom: 1px solid #e2e8f0;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            flex-wrap: nowrap;
         }
         
         .tab-btn {
@@ -109,6 +113,8 @@
             font-weight: 600;
             border-radius: 0;
             cursor: pointer;
+            border: none;
+            white-space: nowrap;
         }
         
         .tab-btn:hover {
@@ -142,6 +148,8 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 8px;
         }
         
         .prediction-header h3 {
@@ -194,6 +202,8 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 8px;
         }
         
         .insights-header h3 {
@@ -393,23 +403,304 @@
             padding: 50px;
             color: #64748b;
         }
-        
+
+        /* ============================================================
+               АДАПТИВНЫЙ ДИЗАЙН
+               ============================================================ */
+
         @media (max-width: 768px) {
-            .stats-row {
-                grid-template-columns: 1fr;
+            .navbar {
+                padding: 0 16px;
+                height: auto;
+                min-height: 56px;
+                flex-wrap: wrap;
+                gap: 8px;
+                padding-top: 8px;
+                padding-bottom: 8px;
             }
-            .charts-grid {
-                grid-template-columns: 1fr;
+            
+            .nav-links {
+                gap: 4px;
+                width: 100%;
+                justify-content: flex-start;
+                flex-wrap: wrap;
             }
-            .container {
-                padding: 20px 16px;
-            }
-            .tab-btn {
-                padding: 10px 16px;
+            
+            .nav-links a {
+                padding: 6px 12px;
                 font-size: 13px;
             }
+            
+            .container {
+                padding: 16px 12px;
+            }
+            
+            .dashboard-title h1 {
+                font-size: 20px;
+            }
+            
+            .dashboard-title p {
+                font-size: 13px;
+            }
+            
+            .tabs {
+                gap: 4px;
+            }
+            
+            .tab-btn {
+                padding: 10px 14px;
+                font-size: 13px;
+            }
+            
+            .stats-row {
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 12px;
+            }
+            
+            .stat-card {
+                padding: 14px 10px;
+            }
+            
+            .stat-value {
+                font-size: 22px;
+            }
+            
+            .stat-label {
+                font-size: 11px;
+            }
+            
+            .prediction-card {
+                padding: 18px 16px;
+            }
+            
             .prediction-value {
                 font-size: 28px;
+            }
+            
+            .prediction-header h3 {
+                font-size: 14px;
+            }
+            
+            .charts-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            
+            .chart-card {
+                padding: 16px;
+            }
+            
+            .chart-card h3 {
+                font-size: 14px;
+                margin-bottom: 12px;
+            }
+            
+            .chart-container {
+                height: 220px;
+            }
+            
+            .insights-card {
+                padding: 16px;
+            }
+            
+            .insights-header h3 {
+                font-size: 15px;
+            }
+            
+            .insight-item {
+                padding: 12px;
+            }
+            
+            .insight-title {
+                font-size: 13px;
+            }
+            
+            .insight-message {
+                font-size: 12px;
+            }
+            
+            .insight-suggestion {
+                font-size: 12px;
+            }
+            
+            .upload-card {
+                padding: 16px;
+            }
+            
+            .upload-area {
+                padding: 20px;
+                font-size: 13px;
+            }
+            
+            .info-note {
+                font-size: 12px;
+                padding: 12px;
+            }
+            
+            .prediction-change {
+                font-size: 13px;
+            }
+            
+            .prediction-info {
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .navbar {
+                padding: 0 12px;
+                min-height: 48px;
+            }
+            
+            .logo {
+                font-size: 17px;
+            }
+            
+            .nav-links a {
+                font-size: 11px;
+                padding: 4px 8px;
+            }
+            
+            .container {
+                padding: 12px 8px;
+            }
+            
+            .dashboard-title h1 {
+                font-size: 18px;
+                padding-left: 8px;
+            }
+            
+            .dashboard-title p {
+                font-size: 12px;
+            }
+            
+            .tab-btn {
+                padding: 8px 10px;
+                font-size: 12px;
+            }
+            
+            .stats-row {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            
+            .stat-card {
+                padding: 12px 8px;
+            }
+            
+            .stat-value {
+                font-size: 20px;
+            }
+            
+            .stat-label {
+                font-size: 10px;
+            }
+            
+            .prediction-card {
+                padding: 14px 12px;
+            }
+            
+            .prediction-value {
+                font-size: 24px;
+            }
+            
+            .prediction-header h3 {
+                font-size: 13px;
+            }
+            
+            .confidence-badge {
+                font-size: 10px;
+                padding: 2px 10px;
+            }
+            
+            .charts-grid {
+                gap: 12px;
+            }
+            
+            .chart-card {
+                padding: 12px;
+                border-radius: 14px;
+            }
+            
+            .chart-card h3 {
+                font-size: 13px;
+            }
+            
+            .chart-container {
+                height: 180px;
+            }
+            
+            .insights-card {
+                padding: 12px;
+                border-radius: 14px;
+            }
+            
+            .insights-header h3 {
+                font-size: 14px;
+            }
+            
+            .insights-count {
+                font-size: 11px;
+                padding: 2px 10px;
+            }
+            
+            .insight-item {
+                padding: 10px;
+            }
+            
+            .insight-title {
+                font-size: 12px;
+            }
+            
+            .insight-message {
+                font-size: 11px;
+            }
+            
+            .insight-suggestion {
+                font-size: 11px;
+            }
+            
+            .upload-card {
+                padding: 12px;
+                border-radius: 14px;
+            }
+            
+            .upload-card-title {
+                font-size: 15px;
+            }
+            
+            .upload-area {
+                padding: 16px;
+                font-size: 12px;
+            }
+            
+            .upload-stats {
+                font-size: 12px;
+                padding: 12px;
+            }
+            
+            .info-note {
+                font-size: 11px;
+                padding: 10px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .stat-value {
+                font-size: 18px;
+            }
+            
+            .prediction-value {
+                font-size: 20px;
+            }
+            
+            .chart-container {
+                height: 150px;
+            }
+            
+            .tab-btn {
+                font-size: 11px;
+                padding: 6px 8px;
             }
         }
     </style>
@@ -548,38 +839,38 @@
                 </div>
             </div>
             
-           <div class="charts-grid">
-    <div class="chart-card">
-        <h3>Расходы по категориям</h3>
-        <div class="chart-container">
-            <canvas id="bankCategoryChart"></canvas>
-        </div>
-    </div>
-    <div class="chart-card">
-        <h3>Топ магазинов</h3>
-        <div class="chart-container">
-            <canvas id="bankMerchantChart"></canvas>
-        </div>
-    </div>
-    <div class="chart-card">
-        <h3>Ежедневные расходы</h3>
-        <div class="chart-container">
-            <canvas id="bankDailyChart"></canvas>
-        </div>
-    </div>
-    <div class="chart-card">
-        <h3>Расходы по дням недели</h3>
-        <div class="chart-container">
-            <canvas id="bankWeeklyChart"></canvas>
-        </div>
-    </div>
-    <div class="chart-card">
-        <h3>Топ категорий расходов</h3>
-        <div class="chart-container">
-            <canvas id="bankTopCategoriesChart"></canvas>
-        </div>
-    </div>
-</div>
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>Расходы по категориям</h3>
+                    <div class="chart-container">
+                        <canvas id="bankCategoryChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Топ магазинов</h3>
+                    <div class="chart-container">
+                        <canvas id="bankMerchantChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Ежедневные расходы</h3>
+                    <div class="chart-container">
+                        <canvas id="bankDailyChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Расходы по дням недели</h3>
+                    <div class="chart-container">
+                        <canvas id="bankWeeklyChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Топ категорий расходов</h3>
+                    <div class="chart-container">
+                        <canvas id="bankTopCategoriesChart"></canvas>
+                    </div>
+                </div>
+            </div>
             
             <div class="info-note">
                 Данные отображаются только из загруженных выписок.
@@ -630,62 +921,60 @@
         }
         
         async function loadInsights(source) {
-    try {
-        const response = await fetch(`/api/analytics/insights?source=${source}`);
-        const data = await response.json();
-        
-        const containerId = source === 'manual' ? 'insightsContainer' : 'bankInsightsContainer';
-        const countId = source === 'manual' ? 'insightsCount' : 'bankInsightsCount';
-        
-        const container = document.getElementById(containerId);
-        const countSpan = document.getElementById(countId);
-        
-        // Проверка на существование элементов
-        if (!container || !countSpan) {
-            console.error(`Elements not found: ${containerId} or ${countId}`);
-            return;
-        }
-        
-        // Если нет данных для выписок
-        if (source === 'bank' && data.total_expenses === 0 && data.insights.length === 0) {
-            container.innerHTML = '<div style="text-align: center; padding: 40px; color: #64748b;">Загрузите выписку, чтобы получить анализ</div>';
-            countSpan.textContent = '0';
-            return;
-        }
-        
-        if (data.insights && data.insights.length > 0) {
-            countSpan.textContent = `${data.insights.length}`;
-            
-            let html = '';
-            for (const insight of data.insights) {
-                let typeClass = '';
-                if (insight.type === 'warning') typeClass = 'insight-warning';
-                else if (insight.type === 'saving') typeClass = 'insight-saving';
-                else if (insight.type === 'success') typeClass = 'insight-success';
-                else typeClass = 'insight-info';
+            try {
+                const response = await fetch(`/api/analytics/insights?source=${source}`);
+                const data = await response.json();
                 
-                html += `
-                    <div class="insight-item ${typeClass}">
-                        <div class="insight-title">${escapeHtml(insight.title)}</div>
-                        <div class="insight-message">${escapeHtml(insight.message)}</div>
-                        <div class="insight-suggestion">💡 ${escapeHtml(insight.suggestion)}</div>
-                    </div>
-                `;
+                const containerId = source === 'manual' ? 'insightsContainer' : 'bankInsightsContainer';
+                const countId = source === 'manual' ? 'insightsCount' : 'bankInsightsCount';
+                
+                const container = document.getElementById(containerId);
+                const countSpan = document.getElementById(countId);
+                
+                if (!container || !countSpan) {
+                    console.error(`Elements not found: ${containerId} or ${countId}`);
+                    return;
+                }
+                
+                if (source === 'bank' && data.total_expenses === 0 && data.insights.length === 0) {
+                    container.innerHTML = '<div style="text-align: center; padding: 40px; color: #64748b;">Загрузите выписку, чтобы получить анализ</div>';
+                    countSpan.textContent = '0';
+                    return;
+                }
+                
+                if (data.insights && data.insights.length > 0) {
+                    countSpan.textContent = `${data.insights.length}`;
+                    
+                    let html = '';
+                    for (const insight of data.insights) {
+                        let typeClass = '';
+                        if (insight.type === 'warning') typeClass = 'insight-warning';
+                        else if (insight.type === 'saving') typeClass = 'insight-saving';
+                        else if (insight.type === 'success') typeClass = 'insight-success';
+                        else typeClass = 'insight-info';
+                        
+                        html += `
+                            <div class="insight-item ${typeClass}">
+                                <div class="insight-title">${escapeHtml(insight.title)}</div>
+                                <div class="insight-message">${escapeHtml(insight.message)}</div>
+                                <div class="insight-suggestion">💡 ${escapeHtml(insight.suggestion)}</div>
+                            </div>
+                        `;
+                    }
+                    container.innerHTML = html;
+                } else if (source === 'manual') {
+                    container.innerHTML = '<div style="text-align: center; padding: 40px; color: #64748b;">Добавьте больше транзакций для получения рекомендаций</div>';
+                    countSpan.textContent = '0';
+                }
+            } catch (error) {
+                console.error('Error loading insights:', error);
+                const containerId = source === 'manual' ? 'insightsContainer' : 'bankInsightsContainer';
+                const container = document.getElementById(containerId);
+                if (container) {
+                    container.innerHTML = '<div class="error">Ошибка загрузки рекомендаций</div>';
+                }
             }
-            container.innerHTML = html;
-        } else if (source === 'manual') {
-            container.innerHTML = '<div style="text-align: center; padding: 40px; color: #64748b;">Добавьте больше транзакций для получения рекомендаций</div>';
-            countSpan.textContent = '0';
         }
-    } catch (error) {
-        console.error('Error loading insights:', error);
-        const containerId = source === 'manual' ? 'insightsContainer' : 'bankInsightsContainer';
-        const container = document.getElementById(containerId);
-        if (container) {
-            container.innerHTML = '<div class="error">Ошибка загрузки рекомендаций</div>';
-        }
-    }
-}
         
         function escapeHtml(text) {
             const div = document.createElement('div');
@@ -863,30 +1152,30 @@
                         options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true } } }
                     });
                 }
-                // Расходы по дням недели для выписок
-const weeklyResponse = await fetch('/api/analytics/bank/weekly');
-const weeklyData = await weeklyResponse.json();
-
-const weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
-const weeklyValues = weekdays.map(day => weeklyData[day] || 0);
-
-if (bankWeeklyChart) bankWeeklyChart.destroy();
-bankWeeklyChart = new Chart(document.getElementById('bankWeeklyChart'), {
-    type: 'bar',
-    data: {
-        labels: weekdays,
-        datasets: [{
-            label: 'Расходы (₽)',
-            data: weeklyValues,
-            backgroundColor: '#8b5cf6'
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: { y: { beginAtZero: true } }
-    }
-});
+                
+                const weeklyResponse = await fetch('/api/analytics/bank/weekly');
+                const weeklyData = await weeklyResponse.json();
+                
+                const weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+                const weeklyValues = weekdays.map(day => weeklyData[day] || 0);
+                
+                if (bankWeeklyChart) bankWeeklyChart.destroy();
+                bankWeeklyChart = new Chart(document.getElementById('bankWeeklyChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: weekdays,
+                        datasets: [{
+                            label: 'Расходы (₽)',
+                            data: weeklyValues,
+                            backgroundColor: '#8b5cf6'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
                 
             } catch (error) {
                 console.error('Error loading bank analytics:', error);

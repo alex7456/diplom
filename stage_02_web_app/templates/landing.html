@@ -294,16 +294,245 @@
             text-align: center;
             font-size: 14px;
         }
-        
+
+        /* ============================================================
+               АДАПТИВНЫЙ ДИЗАЙН (мобилки + планшеты)
+               ============================================================ */
+
+        /* Планшеты */
+        @media (max-width: 992px) {
+            .features-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 24px;
+            }
+            
+            .hero h1 {
+                font-size: 38px;
+            }
+        }
+
+        /* Мобильные устройства */
         @media (max-width: 768px) {
-            .hero h1 { font-size: 32px; }
-            .hero { padding: 60px 20px; }
-            .features { padding: 60px 20px; }
-            .step { min-width: 100%; }
-            .nav-links { gap: 12px; }
-            .navbar { padding: 0 16px; }
-            .stats-grid { gap: 24px; }
-            .stat-label { font-size: 14px; }
+            /* Навигация */
+            .navbar {
+                padding: 0 16px;
+                height: 60px;
+            }
+            
+            .logo {
+                font-size: 18px;
+            }
+            
+            .nav-links {
+                gap: 8px;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+            
+            .nav-links a {
+                font-size: 13px;
+                padding: 4px 0;
+            }
+            
+            .btn-outline {
+                padding: 6px 14px;
+                font-size: 13px;
+            }
+            
+            /* Герой */
+            .hero {
+                padding: 40px 16px;
+            }
+            
+            .hero h1 {
+                font-size: 26px;
+            }
+            
+            .hero p {
+                font-size: 15px;
+                padding: 0 8px;
+            }
+            
+            .hero-buttons {
+                flex-direction: column;
+                align-items: center;
+                gap: 12px;
+            }
+            
+            .btn-primary,
+            .btn-secondary {
+                padding: 10px 28px;
+                font-size: 15px;
+                width: 100%;
+                max-width: 280px;
+                text-align: center;
+            }
+            
+            /* Заголовки секций */
+            .section-title {
+                font-size: 24px;
+            }
+            
+            .section-subtitle {
+                font-size: 14px;
+                margin-bottom: 32px;
+            }
+            
+            /* Features */
+            .features {
+                padding: 40px 16px;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            
+            .feature-card {
+                padding: 20px;
+            }
+            
+            .feature-card h3 {
+                font-size: 17px;
+            }
+            
+            .feature-card p {
+                font-size: 13px;
+            }
+            
+            /* Статистика */
+            .stats-section {
+                padding: 40px 16px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+            }
+            
+            .stat-label {
+                font-size: 14px;
+            }
+            
+            .stat-label small {
+                font-size: 11px;
+            }
+            
+            /* Как работает */
+            .how-it-works {
+                padding: 40px 16px;
+            }
+            
+            .steps {
+                flex-direction: column;
+                gap: 24px;
+                margin-top: 32px;
+            }
+            
+            .step {
+                min-width: 100%;
+            }
+            
+            .step p {
+                font-size: 14px;
+            }
+            
+            /* Технологии */
+            .tech-section {
+                padding: 40px 16px;
+            }
+            
+            .tech-icons {
+                gap: 12px;
+                margin-top: 24px;
+            }
+            
+            .tech-icon {
+                padding: 8px 16px;
+                font-size: 13px;
+            }
+            
+            /* CTA */
+            .cta {
+                padding: 40px 16px;
+            }
+            
+            .cta h2 {
+                font-size: 22px;
+            }
+            
+            .cta p {
+                font-size: 15px;
+            }
+            
+            .cta .btn-primary {
+                padding: 10px 28px;
+                font-size: 15px;
+                width: 100%;
+                max-width: 280px;
+                display: inline-block;
+            }
+            
+            /* Футер */
+            .footer {
+                padding: 24px 16px;
+                font-size: 12px;
+            }
+        }
+
+        /* Очень маленькие телефоны (до 400px) */
+        @media (max-width: 400px) {
+            .navbar {
+                padding: 0 12px;
+                height: 54px;
+            }
+            
+            .logo {
+                font-size: 16px;
+            }
+            
+            .nav-links a {
+                font-size: 11px;
+            }
+            
+            .btn-outline {
+                padding: 4px 10px;
+                font-size: 11px;
+            }
+            
+            .hero h1 {
+                font-size: 22px;
+            }
+            
+            .hero p {
+                font-size: 13px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+            
+            .stat-label {
+                font-size: 12px;
+            }
+            
+            .features-grid {
+                gap: 12px;
+            }
+            
+            .tech-icons {
+                gap: 8px;
+            }
+            
+            .tech-icon {
+                padding: 6px 12px;
+                font-size: 11px;
+            }
+            
+            .cta h2 {
+                font-size: 19px;
+            }
         }
     </style>
 </head>
@@ -314,7 +543,6 @@
             <a href="#features">Возможности</a>
             <a href="#how-it-works">Как работает</a>
             <a href="#tech">Технологии</a>
-            <!-- ИСПРАВЛЕНО: /app → /login -->
             <a href="/login" class="btn-outline">Начать</a>
         </div>
     </nav>
@@ -323,7 +551,6 @@
         <h1>SmartSpend — умный учёт расходов<br>с помощью искусственного интеллекта</h1>
         <p>Автоматическая категоризация транзакций, аналитика расходов и персональные рекомендации по экономии</p>
         <div class="hero-buttons">
-            <!-- ИСПРАВЛЕНО: /app → /login -->
             <a href="/login" class="btn-primary">Начать использовать</a>
             <a href="#features" class="btn-secondary">Узнать больше</a>
         </div>
@@ -335,27 +562,27 @@
         
         <div class="features-grid">
             <div class="feature-card">
-                <h3>ИИ категоризация</h3>
+                <h3>🤖 ИИ категоризация</h3>
                 <p>Модель CatBoost автоматически определяет категорию по описанию транзакции</p>
             </div>
             <div class="feature-card">
-                <h3>Самообучение</h3>
+                <h3>🧠 Самообучение</h3>
                 <p>Модель учится на ваших исправлениях и становится точнее со временем</p>
             </div>
             <div class="feature-card">
-                <h3>Детальная аналитика</h3>
+                <h3>📊 Детальная аналитика</h3>
                 <p>Графики расходов по категориям, топ магазинов, динамика по дням недели</p>
             </div>
             <div class="feature-card">
-                <h3>Прогноз расходов</h3>
+                <h3>📈 Прогноз расходов</h3>
                 <p>ИИ предсказывает ваши траты на следующий месяц на основе истории</p>
             </div>
             <div class="feature-card">
-                <h3>Загрузка выписок</h3>
+                <h3>📁 Загрузка выписок</h3>
                 <p>Поддержка CSV и Excel из Т-Банка, Сбера, Альфы и других банков</p>
             </div>
             <div class="feature-card">
-                <h3>Контроль данных</h3>
+                <h3>🔒 Контроль данных</h3>
                 <p>Локальное хранение, экспорт в Excel, полная история транзакций</p>
             </div>
         </div>
@@ -365,19 +592,19 @@
         <div class="stats-grid">
             <div>
                 <div class="stat-label">Высокая точность</div>
-                <div class="stat-label" style="font-size: 14px; margin-top: 4px;">современный алгоритм CatBoost</div>
+                <div style="font-size: 14px; margin-top: 4px; color: #94a3b8;">современный алгоритм CatBoost</div>
             </div>
             <div>
                 <div class="stat-label">Множество категорий</div>
-                <div class="stat-label" style="font-size: 14px; margin-top: 4px;">18 категорий расходов</div>
+                <div style="font-size: 14px; margin-top: 4px; color: #94a3b8;">18 категорий расходов</div>
             </div>
             <div>
                 <div class="stat-label">Универсальность</div>
-                <div class="stat-label" style="font-size: 14px; margin-top: 4px;">поддержка популярных банков</div>
+                <div style="font-size: 14px; margin-top: 4px; color: #94a3b8;">поддержка популярных банков</div>
             </div>
             <div>
                 <div class="stat-label">Мгновенный результат</div>
-                <div class="stat-label" style="font-size: 14px; margin-top: 4px;">предсказание за миллисекунды</div>
+                <div style="font-size: 14px; margin-top: 4px; color: #94a3b8;">предсказание за миллисекунды</div>
             </div>
         </div>
     </section>
@@ -422,7 +649,6 @@
     <section class="cta">
         <h2>Готовы начать экономить?</h2>
         <p>Присоединяйтесь к тем, кто уже контролирует свои финансы с SmartSpend</p>
-        <!-- ИСПРАВЛЕНО: /app → /login -->
         <a href="/login" class="btn-primary">Начать использование</a>
     </section>
     

@@ -47,6 +47,7 @@
             display: flex;
             gap: 8px;
             align-items: center;
+            flex-wrap: wrap;
         }
         
         .nav-links a {
@@ -100,15 +101,21 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         
         .add-transaction-btn {
             background: linear-gradient(135deg, #10b981, #059669);
             padding: 6px 16px;
             font-size: 13px;
+            border: none;
+            color: white;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
         }
         
-        /* Стили для шаблонов */
         .templates-section {
             margin-bottom: 20px;
         }
@@ -203,6 +210,7 @@
             font-size: 24px;
             padding: 0;
             cursor: pointer;
+            border: none;
         }
         
         .form-group {
@@ -345,6 +353,7 @@
             margin-top: 20px;
             padding-top: 20px;
             border-top: 1px solid #e2e8f0;
+            flex-wrap: wrap;
         }
         
         .result-card {
@@ -485,61 +494,279 @@
             border: 1px solid #e2e8f0;
         }
         
-        @media (max-width: 768px) {
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            .container {
-                padding: 20px 16px;
-            }
-            .card {
-                padding: 20px;
-            }
+        .logout-btn {
+            background: rgba(239, 68, 68, 0.9);
+            border: none;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .logout-btn:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+        
+        .username {
+            color: #475569;
+            font-size: 14px;
+            font-weight: 500;
+            margin-left: 8px;
+            padding: 6px 12px;
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+
+        /* ============================================================
+               АДАПТИВНЫЙ ДИЗАЙН
+               ============================================================ */
+
+        @media (max-width: 992px) {
             .transaction-fields {
-                grid-template-columns: 1fr;
-                gap: 12px;
+                grid-template-columns: 1fr 1fr;
             }
         }
-        .logout-btn {
-    background: rgba(239, 68, 68, 0.9);
-    border: none;
-    color: white;
-    padding: 6px 16px;
-    border-radius: 10px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.2s;
-}
 
-.logout-btn:hover {
-    background: #dc2626;
-    transform: translateY(-1px);
-}
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 0 16px;
+                height: auto;
+                min-height: 56px;
+                flex-wrap: wrap;
+                gap: 8px;
+                padding-top: 8px;
+                padding-bottom: 8px;
+            }
+            
+            .nav-links {
+                gap: 4px;
+                width: 100%;
+                justify-content: flex-start;
+                flex-wrap: wrap;
+            }
+            
+            .nav-links a {
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+            
+            .username {
+                font-size: 12px;
+                padding: 4px 10px;
+                margin-left: 0;
+            }
+            
+            .logout-btn {
+                padding: 4px 12px;
+                font-size: 12px;
+            }
+            
+            .container {
+                padding: 16px 12px;
+            }
+            
+            .card {
+                padding: 16px;
+            }
+            
+            .card-title {
+                font-size: 16px;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            
+            .add-transaction-btn {
+                width: 100%;
+                text-align: center;
+                padding: 10px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+            
+            .stat-card {
+                padding: 14px;
+            }
+            
+            .stat-value {
+                font-size: 24px;
+            }
+            
+            .stat-label {
+                font-size: 10px;
+            }
+            
+            .transaction-fields {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .transaction-fields .form-group {
+                margin-bottom: 0;
+            }
+            
+            .transaction-fields textarea,
+            .transaction-fields input {
+                font-size: 14px;
+                padding: 10px 12px;
+            }
+            
+            .templates-grid {
+                gap: 8px;
+            }
+            
+            .template-btn {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+            
+            .batch-actions {
+                flex-direction: column;
+            }
+            
+            .batch-actions button {
+                width: 100%;
+                justify-content: center;
+                text-align: center;
+            }
+            
+            .action-group {
+                flex-direction: column;
+            }
+            
+            .action-group button {
+                width: 100%;
+                text-align: center;
+                justify-content: center;
+            }
+            
+            .modal-content {
+                padding: 20px;
+                width: 95%;
+            }
+            
+            .results-list {
+                max-height: 250px;
+            }
+        }
 
-.username {
-    color: #475569;
-    font-size: 14px;
-    font-weight: 500;
-    margin-left: 8px;
-    padding: 6px 12px;
-    background: #f1f5f9;
-    border-radius: 10px;
-}
+        @media (max-width: 480px) {
+            .navbar {
+                padding: 0 12px;
+                min-height: 48px;
+            }
+            
+            .logo {
+                font-size: 17px;
+            }
+            
+            .nav-links a {
+                font-size: 11px;
+                padding: 4px 8px;
+            }
+            
+            .username {
+                font-size: 10px;
+                padding: 2px 8px;
+            }
+            
+            .logout-btn {
+                font-size: 10px;
+                padding: 3px 10px;
+            }
+            
+            .container {
+                padding: 12px 8px;
+            }
+            
+            .card {
+                padding: 12px;
+                border-radius: 14px;
+            }
+            
+            .card-title {
+                font-size: 14px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+            
+            .stat-card {
+                padding: 10px;
+                border-radius: 12px;
+            }
+            
+            .stat-value {
+                font-size: 20px;
+            }
+            
+            .stat-label {
+                font-size: 9px;
+            }
+            
+            .transaction-item {
+                padding: 12px;
+            }
+            
+            .transaction-number {
+                font-size: 12px;
+            }
+            
+            .remove-transaction {
+                font-size: 10px;
+                padding: 2px 10px;
+            }
+            
+            .transaction-fields textarea,
+            .transaction-fields input {
+                font-size: 13px;
+                padding: 8px 10px;
+            }
+            
+            .template-btn {
+                font-size: 11px;
+                padding: 4px 10px;
+            }
+            
+            .batch-actions button,
+            .action-group button {
+                font-size: 12px;
+                padding: 8px 16px;
+            }
+            
+            .result-item {
+                font-size: 12px;
+                padding: 8px;
+            }
+            
+            .category-badge {
+                font-size: 10px;
+                padding: 3px 10px;
+            }
+        }
     </style>
 </head>
 <body>
     <nav class="navbar">
-    <div class="logo">SmartSpend</div>
-    <div class="nav-links">
-        <a href="/app">Транзакции</a>
-        <a href="/dashboard">Аналитика</a>
-        <a href="/history">История</a>
-        <a href="/statements">Выписки</a>
-        <span class="username">{{ user.username }}</span>
-        <button onclick="logout()" class="logout-btn">Выйти</button>
-    </div>
-</nav>
+        <div class="logo">SmartSpend</div>
+        <div class="nav-links">
+            <a href="/app">Транзакции</a>
+            <a href="/dashboard">Аналитика</a>
+            <a href="/history">История</a>
+            <a href="/statements">Выписки</a>
+            <span class="username">{{ user.username }}</span>
+            <button onclick="logout()" class="logout-btn">Выйти</button>
+        </div>
+    </nav>
     
     <div class="container">
         <!-- Множественный ввод транзакций -->
@@ -640,9 +867,9 @@
                 <label>Сумма (₽)</label>
                 <input type="number" id="templateAmount" step="0.01" placeholder="Отрицательная для расходов">
             </div>
-            <div style="display: flex; gap: 12px; margin-top: 20px;">
-                <button onclick="saveUserTemplate()" class="btn-success">Сохранить</button>
-                <button onclick="closeTemplateModal()" class="btn-secondary">Отмена</button>
+            <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
+                <button onclick="saveUserTemplate()" class="btn-success" style="flex: 1;">Сохранить</button>
+                <button onclick="closeTemplateModal()" class="btn-secondary" style="flex: 1;">Отмена</button>
             </div>
         </div>
     </div>
@@ -662,7 +889,6 @@
         
         function renderUserTemplates() {
             const grid = document.getElementById('templatesGrid');
-            // Удаляем старые пользовательские шаблоны
             const allButtons = grid.querySelectorAll('.template-btn');
             for (const btn of allButtons) {
                 if (btn.classList.contains('user-template')) {
@@ -671,7 +897,6 @@
             }
             const addBtn = grid.querySelector('.add-template-btn');
             
-            // Добавляем пользовательские шаблоны
             for (const t of userTemplates) {
                 const btn = document.createElement('button');
                 btn.className = 'template-btn user-template';
@@ -920,14 +1145,14 @@
                 }
             }
             
-            let html = `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            let html = `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
                             <div class="success">Сохранено: ${saved}, ошибок: ${errors}</div>
                             <button onclick="closeBatchResult()" style="background: #64748b; padding: 6px 16px;">Закрыть</button>
                         </div>`;
-            html += '<div class="results-list" style="max-height: 300px; overflow-y: auto;"><strong>Результаты:</strong>';
+            html += '<div class="results-list"><strong>Результаты:</strong>';
             for (const r of results) {
                 const icon = r.status === 'success' ? '✓' : '✗';
-                html += `<div class="result-item" style="padding: 8px; margin-bottom: 6px;">${icon} ${escapeHtml(r.description)} → <span class="category-badge category-${r.category}" style="font-size: 11px; padding: 2px 10px;">${r.category}</span></div>`;
+                html += `<div class="result-item">${icon} ${escapeHtml(r.description)} → <span class="category-badge category-${r.category}" style="font-size: 11px; padding: 2px 10px;">${r.category}</span></div>`;
             }
             html += '</div>';
             
@@ -974,7 +1199,6 @@
             } 
         }
         
-        // Функция выхода - для сессионной авторизации
         function logout() {
             window.location.href = '/logout';
         }

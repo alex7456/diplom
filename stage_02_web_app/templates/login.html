@@ -104,6 +104,128 @@
         }
         .form { display: none; }
         .form.active { display: block; }
+
+        /* ============================================================
+               АДАПТИВНЫЙ ДИЗАЙН (мобилки + планшеты)
+               ============================================================ */
+
+        /* Планшеты */
+        @media (max-width: 768px) {
+            .auth-card {
+                padding: 28px 24px;
+            }
+            
+            .logo h1 {
+                font-size: 24px;
+            }
+            
+            .logo p {
+                font-size: 13px;
+            }
+            
+            .tab {
+                font-size: 14px;
+                padding: 10px;
+            }
+            
+            input {
+                font-size: 14px;
+                padding: 10px 14px;
+            }
+            
+            button {
+                font-size: 15px;
+                padding: 12px;
+            }
+        }
+
+        /* Мобильные устройства */
+        @media (max-width: 480px) {
+            body {
+                padding: 12px;
+            }
+            
+            .auth-card {
+                padding: 20px 16px;
+                border-radius: 20px;
+            }
+            
+            .logo {
+                margin-bottom: 24px;
+            }
+            
+            .logo h1 {
+                font-size: 22px;
+            }
+            
+            .logo p {
+                font-size: 12px;
+            }
+            
+            .tabs {
+                margin-bottom: 24px;
+            }
+            
+            .tab {
+                font-size: 13px;
+                padding: 8px;
+            }
+            
+            .form-group {
+                margin-bottom: 18px;
+            }
+            
+            label {
+                font-size: 11px;
+                margin-bottom: 6px;
+            }
+            
+            input {
+                font-size: 13px;
+                padding: 10px 12px;
+                border-radius: 10px;
+            }
+            
+            button {
+                font-size: 14px;
+                padding: 12px;
+                border-radius: 10px;
+                margin-top: 4px;
+            }
+            
+            .error-message {
+                font-size: 13px;
+                padding: 10px;
+                border-radius: 10px;
+                margin-bottom: 16px;
+            }
+        }
+
+        /* Очень маленькие телефоны */
+        @media (max-width: 360px) {
+            .auth-card {
+                padding: 16px 12px;
+            }
+            
+            .logo h1 {
+                font-size: 19px;
+            }
+            
+            .tab {
+                font-size: 12px;
+                padding: 6px;
+            }
+            
+            input {
+                font-size: 12px;
+                padding: 8px 10px;
+            }
+            
+            button {
+                font-size: 13px;
+                padding: 10px;
+            }
+        }
     </style>
 </head>
 <body>

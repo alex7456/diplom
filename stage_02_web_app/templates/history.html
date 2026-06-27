@@ -47,6 +47,7 @@
             display: flex;
             gap: 8px;
             align-items: center;
+            flex-wrap: wrap;
         }
         
         .nav-links a {
@@ -103,6 +104,7 @@
         .filter-group {
             display: flex;
             gap: 10px;
+            flex-wrap: wrap;
         }
         
         select {
@@ -119,9 +121,15 @@
             border-color: #2563eb;
         }
         
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
         table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 600px;
         }
         
         th, td {
@@ -135,6 +143,7 @@
             font-weight: 600;
             color: #475569;
             font-size: 13px;
+            white-space: nowrap;
         }
         
         tr:hover {
@@ -147,9 +156,9 @@
             border-radius: 24px;
             font-weight: 600;
             font-size: 13px;
+            white-space: nowrap;
         }
         
-        /* Основные категории */
         .category-Продукты { background: #22c55e; color: white; }
         .category-Транспорт { background: #3b82f6; color: white; }
         .category-Кафе { background: #f97316; color: white; }
@@ -160,8 +169,6 @@
         .category-Развлечения { background: #ef4444; color: white; }
         .category-Одежда { background: #8b5cf6; color: white; }
         .category-Переводы { background: #64748b; color: white; }
-        
-        /* Новые категории */
         .category-Каршеринг { background: #0ea5e9; color: white; }
         .category-Маркетплейсы { background: #d946ef; color: white; }
         .category-Подписки { background: #14b8a6; color: white; }
@@ -224,6 +231,7 @@
             border-radius: 8px;
             border: 1.5px solid #e2e8f0;
             background: #ffffff;
+            max-width: 140px;
         }
         
         .pagination {
@@ -233,6 +241,7 @@
             margin-top: 24px;
             padding-top: 16px;
             border-top: 1px solid #e2e8f0;
+            flex-wrap: wrap;
         }
         
         .pagination button {
@@ -244,6 +253,8 @@
             cursor: pointer;
             font-size: 14px;
             font-weight: 500;
+            min-height: 44px;
+            min-width: 44px;
         }
         
         .pagination button:disabled {
@@ -254,6 +265,8 @@
         .pagination span {
             padding: 8px;
             color: #475569;
+            display: flex;
+            align-items: center;
         }
         
         .loading {
@@ -271,20 +284,183 @@
             color: #10b981;
             font-weight: 500;
         }
-        
+
+        /* ============================================================
+               АДАПТИВНЫЙ ДИЗАЙН
+               ============================================================ */
+
         @media (max-width: 768px) {
+            .navbar {
+                padding: 0 16px;
+                height: auto;
+                min-height: 56px;
+                flex-wrap: wrap;
+                gap: 8px;
+                padding-top: 8px;
+                padding-bottom: 8px;
+            }
+            
+            .nav-links {
+                gap: 4px;
+                width: 100%;
+                justify-content: flex-start;
+                flex-wrap: wrap;
+            }
+            
+            .nav-links a {
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+            
+            .container {
+                padding: 16px 12px;
+            }
+            
+            .history-card {
+                padding: 16px;
+                border-radius: 14px;
+            }
+            
             .history-header {
                 flex-direction: column;
                 align-items: stretch;
+                gap: 12px;
             }
-            table {
+            
+            .history-header h2 {
+                font-size: 16px;
+            }
+            
+            .filter-group {
+                width: 100%;
+            }
+            
+            .filter-group select {
+                width: 100%;
+                padding: 10px 12px;
+                font-size: 14px;
+            }
+            
+            .table-wrapper {
+                margin: 0 -8px;
+                padding: 0 8px;
+            }
+            
+            th, td {
+                padding: 8px 6px;
                 font-size: 12px;
             }
-            th, td {
-                padding: 8px;
+            
+            th {
+                font-size: 11px;
             }
+            
+            .category-badge {
+                font-size: 10px;
+                padding: 3px 10px;
+            }
+            
+            .edit-btn, .delete-btn, .save-btn, .cancel-btn {
+                font-size: 10px;
+                padding: 3px 8px;
+                min-height: 30px;
+            }
+            
+            .category-select {
+                font-size: 12px;
+                padding: 4px 6px;
+                max-width: 100px;
+            }
+            
+            .pagination {
+                gap: 8px;
+            }
+            
+            .pagination button {
+                font-size: 12px;
+                padding: 6px 12px;
+                min-height: 38px;
+                min-width: 38px;
+            }
+            
+            .pagination span {
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .navbar {
+                padding: 0 12px;
+                min-height: 48px;
+            }
+            
+            .logo {
+                font-size: 17px;
+            }
+            
+            .nav-links a {
+                font-size: 11px;
+                padding: 4px 8px;
+            }
+            
             .container {
-                padding: 20px 16px;
+                padding: 12px 8px;
+            }
+            
+            .history-card {
+                padding: 12px;
+                border-radius: 12px;
+            }
+            
+            .history-header h2 {
+                font-size: 14px;
+            }
+            
+            .table-wrapper {
+                margin: 0 -4px;
+                padding: 0 4px;
+            }
+            
+            th, td {
+                padding: 6px 4px;
+                font-size: 11px;
+            }
+            
+            th {
+                font-size: 10px;
+            }
+            
+            .category-badge {
+                font-size: 9px;
+                padding: 2px 8px;
+            }
+            
+            .edit-btn, .delete-btn, .save-btn, .cancel-btn {
+                font-size: 9px;
+                padding: 2px 6px;
+                min-height: 26px;
+                min-width: 26px;
+            }
+            
+            .category-select {
+                font-size: 10px;
+                padding: 3px 4px;
+                max-width: 80px;
+            }
+            
+            .amount-negative, .amount-positive {
+                font-size: 11px;
+            }
+            
+            .pagination button {
+                font-size: 11px;
+                padding: 4px 10px;
+                min-height: 34px;
+                min-width: 34px;
+            }
+            
+            .pagination span {
+                font-size: 11px;
             }
         }
     </style>
@@ -329,8 +505,10 @@
                 </div>
             </div>
             
-            <div id="transactionsTable">
-                <div class="loading">Загрузка...</div>
+            <div class="table-wrapper">
+                <div id="transactionsTable">
+                    <div class="loading">Загрузка...</div>
+                </div>
             </div>
             
             <div class="pagination" id="pagination">
@@ -359,10 +537,8 @@
         
         setActiveNav();
         
-        // Функция для форматирования даты (только YYYY-MM-DD)
         function formatDate(dateString) {
             if (!dateString) return '—';
-            // Если пришла строка с временем, берём только первую часть (дату)
             return dateString.split(' ')[0];
         }
         
