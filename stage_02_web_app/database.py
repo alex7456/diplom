@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 import json
 
-# Создание базы данных (SQLite)
 DATABASE_URL = "sqlite:///./transactions.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

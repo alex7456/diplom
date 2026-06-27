@@ -23,14 +23,12 @@ from database import TrainingFeedback, Transaction, User, UploadedFile, create_t
 from ml_service import EnhancedExpenseClassifier
 from analytics import AnalyticsService
 
-# Создание приложения
 app = FastAPI(
     title="SmartSpend API",
     description="Автоматическая категоризация банковских транзакций",
     version="3.0.0"
 )
 
-# Добавляем middleware для сессий (ВАЖНО: до CORS)
 app.add_middleware(
     SessionMiddleware,
     secret_key="smartspend-session-secret-key-2024-change-in-production",
@@ -39,7 +37,6 @@ app.add_middleware(
     same_site="lax"
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -48,17 +45,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Шаблоны
 templates = Jinja2Templates(directory="templates")
 
-# Инициализация ML сервиса
 ml_service = EnhancedExpenseClassifier()
 
-# Создание таблиц БД
 create_tables()
 
 
-# ============= Вспомогательные функции для работы с паролями =============
 
 def hash_password(password: str) -> str:
     """Хеширование пароля с солью"""
@@ -76,8 +69,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
-# ============= Зависимость для получения текущего пользователя из сессии =============
-
 async def get_current_user(request: Request, db: Session = Depends(get_db)):
     """Получение текущего пользователя из сессии"""
     user_id = request.session.get("user_id")
@@ -89,8 +80,6 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403, detail="User not found")
     return user
 
-
-# ============= Загрузка модели =============
 
 def auto_retrain_if_needed(db: Session):
     """Автоматическое дообучение модели"""
@@ -181,7 +170,6 @@ async def startup_event():
         print(f"Модель обучена с нуля. Точность: {metrics.get('accuracy', 0):.3f}")
 
 
-# ============= Веб-страницы =============
 
 @app.get("/", response_class=HTMLResponse)
 async def landing(request: Request):
@@ -195,13 +183,11 @@ async def landing(request: Request):
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     """Страница входа и регистрации"""
-    # ЕСЛИ УЖЕ АВТОРИЗОВАН - ПЕРЕНАПРАВЛЯЕМ НА /app
     if request.session.get("user_id"):
         return RedirectResponse(url="/app", status_code=303)
     return templates.TemplateResponse("login.html", {"request": request})
 
 
-# Добавьте эти print в функции
 
 @app.post("/login")
 async def login(
@@ -230,7 +216,6 @@ async def login(
             "error": "Неверный логин или пароль"
         })
     
-    # Сохраняем пользователя в сессии
     request.session["user_id"] = user.id
     request.session["username"] = user.username
     
@@ -289,7 +274,6 @@ async def register(
             "error": "Пароль должен быть не менее 4 символов"
         })
     
-    # Создаём пользователя
     user = User(
         email=email,
         username=username,
@@ -299,7 +283,6 @@ async def register(
     db.commit()
     db.refresh(user)
     
-    # Автоматически входим после регистрации
     request.session["user_id"] = user.id
     request.session["username"] = user.username
     
@@ -309,11 +292,8 @@ async def register(
 @app.get("/logout")
 async def logout(request: Request):
     """Выход из системы - полная очистка сессии"""
-    # Очищаем всю сессию
     request.session.clear()
-    # Создаём редирект на лендинг
     response = RedirectResponse(url="/", status_code=303)
-    # Удаляем cookie с сессией на клиенте
     response.delete_cookie("smartspend_session")
     return response
 
@@ -355,7 +335,6 @@ async def statements_page(request: Request, current_user: User = Depends(get_cur
     })
 
 
-# ============= API эндпоинты (с авторизацией через сессию) =============
 
 @app.post("/api/predict")
 async def predict_transaction(
@@ -799,7 +778,6 @@ async def get_insights(
     
     insights = []
     
-    # ========== 1. Если данных мало ==========
     if total_transactions < 5:
         insights.append({
             "type": "info",
@@ -814,9 +792,7 @@ async def get_insights(
             "period_days": 30
         }
     
-    # ========== 2. Анализ по магазинам (логичный) ==========
     for merchant, total, count in top_merchants[:5]:
-        # Частые покупки (3+ раза)
         if count >= 3 and total > 1000:
             avg_check = total / count
             insights.append({
@@ -825,7 +801,6 @@ async def get_insights(
                 "message": f"{count} покупок на сумму {total:.0f} ₽, средний чек {avg_check:.0f} ₽",
                 "suggestion": "Попробуйте отслеживать эти траты — возможно, стоит искать альтернативы"
             })
-        # Крупная разовая покупка
         elif count == 1 and total > 3000:
             insights.append({
                 "type": "warning",
@@ -833,7 +808,6 @@ async def get_insights(
                 "message": f"{total:.0f} ₽ (первая покупка в этом магазине)",
                 "suggestion": "Если это разовая покупка — ок. Если планируете повторять — проверьте альтернативы"
             })
-        # Топ магазинов по сумме (просто информируем)
         elif total > 2000 and insights_count_by_type(insights, f"Топ магазинов") < 1:
             insights.append({
                 "type": "info",
@@ -842,9 +816,7 @@ async def get_insights(
                 "suggestion": "Посмотрите, можно ли оптимизировать эти траты"
             })
     
-    # ========== 3. Анализ категорий ==========
     if categories:
-        # Топ категория по сумме
         top_category = max(categories.items(), key=lambda x: x[1]['total'])
         top_percent = (top_category[1]['total'] / total_expenses) * 100 if total_expenses > 0 else 0
         
@@ -856,7 +828,6 @@ async def get_insights(
                 "suggestion": "Проверьте, можно ли сократить расходы в этой категории"
             })
         
-        # Если есть категории с тратами > 5000 ₽
         for category, data in categories.items():
             spent = data.get('total', 0)
             if spent > 5000:
@@ -866,10 +837,8 @@ async def get_insights(
                     "message": f"Вы потратили {spent:.0f} ₽",
                     "suggestion": f"Рекомендуем проанализировать, можно ли сократить эти траты на 10-20%"
                 })
-                break  # Показываем одну самую крупную категорию
+                break 
     
-    # ========== 4. Специфические категории ==========
-    # Подписки
     subscriptions_spent = categories.get('Подписки', {}).get('total', 0)
     if subscriptions_spent > 300:
         insights.append({
@@ -879,7 +848,6 @@ async def get_insights(
             "suggestion": "Откажитесь от неиспользуемых подписок — экономия до 30%"
         })
     
-    # Кафе
     cafe_spent = categories.get('Кафе', {}).get('total', 0)
     if cafe_spent > 3000:
         savings = cafe_spent * 0.4
@@ -897,7 +865,6 @@ async def get_insights(
             "suggestion": "Попробуйте готовить дома 2-3 раза в неделю вместо походов в кафе"
         })
     
-    # Транспорт
     taxi_spent = categories.get('Такси', {}).get('total', 0)
     carsharing_spent = categories.get('Каршеринг', {}).get('total', 0)
     transport_spent = taxi_spent + carsharing_spent
@@ -911,7 +878,6 @@ async def get_insights(
             "suggestion": f"Используйте общественный транспорт — экономия до {savings:.0f} ₽!"
         })
     
-    # Маркетплейсы
     marketplace_spent = categories.get('Маркетплейсы', {}).get('total', 0)
     if marketplace_spent > 5000:
         insights.append({
@@ -921,7 +887,6 @@ async def get_insights(
             "suggestion": "Перед покупкой проверяйте, действительно ли нужна вещь. Используйте списки желаний"
         })
     
-    # ========== 5. Общая финансовая дисциплина ==========
     if total_expenses > 50000:
         savings_potential = total_expenses * 0.15
         insights.append({
@@ -945,7 +910,6 @@ async def get_insights(
             "suggestion": "Проанализируйте топ-3 категории трат — возможно, там есть резервы для экономии"
         })
     
-    # ========== 6. Если нет ни одного совета — добавить общий ==========
     if len(insights) == 0 and total_transactions >= 5:
         insights.append({
             "type": "info",
@@ -954,12 +918,11 @@ async def get_insights(
             "suggestion": "Добавляйте транзакции регулярно, чтобы получать персонализированные советы"
         })
     
-    # Сортируем советы: warning → saving → info → success
     type_priority = {'warning': 0, 'saving': 1, 'info': 2, 'success': 3}
     insights.sort(key=lambda x: type_priority.get(x.get('type', 'info'), 2))
     
     return {
-        "insights": insights[:8],  # максимум 8 советов
+        "insights": insights[:8],  
         "total_expenses": total_expenses,
         "recommendations_count": len(insights),
         "period_days": 30
