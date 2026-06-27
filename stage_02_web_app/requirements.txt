@@ -12,8 +12,8 @@ matplotlib==3.8.2
 seaborn==0.13.0
 pydantic==2.5.0
 sqlalchemy==2.0.23
-python-jose==3.3.0
-python-jose-cryptography==3.3.0
+python-jose[cryptography]==3.3.0
 openpyxl==3.1.2
 chardet==5.2.0
 bcrypt==4.1.2
+itsdangerous==2.1.2

@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  smartspend:
+    build: .
+    container_name: smartspend-app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./transactions.db:/app/transactions.db
+      - ./enhanced_model.pkl:/app/enhanced_model.pkl
+    restart: unless-stopped
